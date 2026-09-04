@@ -1,0 +1,36 @@
+/* Em telas grandes cada painel rola por conta própria; em telas pequenas a
+   página empilha os dois e rola normalmente. */
+@media (min-width: 992px) {
+  .painel {
+    height: 100vh;
+    overflow-y: auto;
+  }
+}
+
+.preview-frame {
+  width: 100%;
+  max-width: 46rem;
+  aspect-ratio: 210 / 297; /* A4 retrato */
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.25rem;
+}
+
+@media (min-width: 992px) {
+  .preview-frame {
+    /* Nunca mais alta que a área visível, para caber sem rolagem interna. */
+    max-height: calc(100vh - 7rem);
+    width: auto;
+    height: 100%;
+    aspect-ratio: 210 / 297;
+  }
+}
+
+.preview-frame[hidden] + .preview-vazio,
+.preview-vazio {
+  align-self: center;
+}
+
+legend.form-label {
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
