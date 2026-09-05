@@ -294,13 +294,11 @@ da biblioteca padrão.
 O limite efetivo passa a ser `min(MAX_FOLHAS, math.comb(n, k))`, e a validação vive
 em `ConfiguracaoJogo.validar()`, como as demais regras.
 
-**Verificação manual pedida ao usuário antes de implementar:**
+**Verificação manual — confirmada pelo usuário.** A interpretação é a combinação:
+folhas com os mesmos elementos em ordens diferentes são a mesma folha. Os problemas
+só aparecem quando o universo é pequeno ou quando `k` está próximo de `n`.
 
-1. **Confirmar a interpretação.** Se folhas com os mesmos elementos em ordens
-   diferentes forem consideradas *diferentes*, a fórmula não é a combinação e sim o
-   arranjo, `n! / (n − k)!`, um número muito maior. O item 6.1.7 indica que a
-   intenção é a combinação — confirmar.
-2. **Conferir estes valores**, calculados com `math.comb`:
+Valores conferidos, calculados com `math.comb`:
 
    | n | k | C(n, k) |
    |---|---|---|
@@ -335,11 +333,16 @@ possíveis: `Número de folhas (máximo: {maximo_folhas})` ou
 `Número de folhas (de 1 a {maximo_folhas})`.
 
 O cálculo precisa existir nos dois lados: no backend, como validação, e no frontend,
-para exibir o número sem ida ao servidor. O JavaScript não tem `math.comb`, então
-será preciso escrever a combinação — cuidado com o estouro de precisão, já que
-`C(75, 24)` passa muito de `Number.MAX_SAFE_INTEGER`. Duas saídas a avaliar:
-`BigInt`, ou limitar o cálculo a `MAX_FOLHAS` (basta saber se o máximo é maior que
-500, não o valor exato).
+para exibir o número sem ida ao servidor.
+
+**Decidido com o usuário:** no JavaScript o cálculo satura em **1000 folhas** — ao
+atingir esse valor, para de multiplicar e devolve 1000. Isso dispensa `BigInt` e
+resolve o estouro de `Number.MAX_SAFE_INTEGER` (C(75, 24) ≈ 2,6 × 10¹⁹). O contexto
+de uso justifica: a maior turma da escola tem 30 alunos e a escola inteira, 200.
+
+Conciliar com o backend na implementação: `MAX_FOLHAS` hoje é 500 em
+`src/bingo/models.py`, então o limite efetivo continua sendo 500 — decidir se o teto
+sobe para 1000 ou se o frontend satura em `MAX_FOLHAS`.
 
 Arquivos: `static/index.html` e `static/app.js`.
 
