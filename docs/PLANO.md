@@ -1,8 +1,13 @@
 # Sistema de Bingo via Web — Plano de Implementação
 
+> **Andamento** — Etapas 0 a 6 concluídas (backend, PDF, API, interface e conexão),
+> mais o logo na célula central. Pendentes: 6.1 (refinamentos), 7 (container),
+> 8 (servidor, nuvem e segurança) e 9 (documentação).
+
 ## Contexto
 
-O repositório está vazio (scaffold `uv`, sem nenhum commit ainda). O objetivo é um
+O repositório estava vazio quando este plano foi escrito (scaffold `uv`, sem nenhum
+commit ainda). O objetivo é um
 protótipo simples porém bem estruturado de um gerador de cartelas de bingo para
 impressão: o usuário define os parâmetros do jogo num painel lateral, vê o
 resultado como ele sairá impresso, e baixa um PDF pronto para imprimir. O serviço
@@ -220,11 +225,103 @@ Commit: `feat: conecta interface ao backend`.
 
 **Parar aqui e pedir avaliação do usuário.**
 
-## Etapa 7 — Documentação
+## Etapa 6.1 — Refinamentos
 
-`README.md` com: o que é, como rodar localmente (`uv run uvicorn bingo.api:app --reload`),
-como rodar os testes (`uv run pytest`), e uma nota curta sobre deploy
-(container com `uvicorn`, sem estado, sem volume).
+Ajustes identificados durante a execução, todos pequenos e independentes entre si.
+
+### 6.1.1 Recorte automático da margem do logo
+
+O logo ocupa 88% da célula central, mas o arquivo tem margem branca própria, então
+o desenho aparece com cerca de 60% do lado da célula. Recortar a borda uniforme na
+geração (`Image.getbbox()` sobre a imagem invertida, com PIL, que já vem instalado
+como dependência do reportlab) faz o logo preencher a célula de verdade. Vale para
+qualquer logo, não só o atual. O recorte é calculado uma vez e reaproveitado entre
+as folhas, não a cada página.
+
+Arquivo: `src/bingo/pdf.py` (`_desenhar_logo`).
+
+### 6.1.2 Controle do logo na interface
+
+Hoje o logo aparece sempre que há célula central livre, é sempre o mesmo arquivo e
+não há como desligá-lo. Acrescentar no painel um seletor com três opções:
+
+- **sem logo** — a célula central fica cinza, como antes;
+- **logo padrão** — `static/images/logo.jpeg`;
+- **enviar imagem** — o usuário escolhe um arquivo próprio.
+
+### 6.1.3 Botão de personalizar o logo (envio de imagem)
+
+O envio da imagem quebra a simetria atual da API, em que toda requisição é JSON e o
+serviço é stateless. Duas saídas, a decidir na implementação:
+
+- **imagem embutida no JSON** como data URI (base64), mantendo uma só requisição e
+  o serviço sem estado — mais simples, custo de ~33% no tamanho do corpo;
+- **`multipart/form-data`** nas duas rotas, mais convencional para upload.
+
+Em ambos os casos é preciso validar formato (PNG/JPEG), dimensões e tamanho máximo,
+já que o serviço vai ficar exposto na internet — ver as questões de segurança da
+Etapa 8.
+
+### 6.1.4 Botão "Restaurar padrões"
+
+Os parâmetros ficam no `localStorage` do navegador (`bingo.configuracao`), e hoje só
+dá para voltar aos valores padrão pelo console do navegador — inaceitável para um
+serviço público. Um botão no painel limpa a chave e recarrega o formulário. A
+preferência de tema (`bingo.tema`) fica de fora, por ser configuração de exibição e
+não do jogo.
+
+Arquivo: `static/app.js` e `static/index.html`.
+
+Commit por item, como nas demais etapas.
+
+**Parar aqui e pedir avaliação do usuário.**
+
+## Etapa 7 — Container
+
+Empacotar o serviço em uma imagem, que é o artefato que as etapas seguintes
+publicam.
+
+- `Dockerfile` com `uv` para instalar as dependências, executando como usuário sem
+  privilégios e expondo `uvicorn`.
+- Incluir o diretório `static/` na imagem: hoje `RAIZ_PROJETO` é calculada a partir
+  do arquivo-fonte (`src/bingo/pdf.py`, `parents[2]`), então a imagem precisa copiar
+  a árvore do projeto — instalar apenas o wheel deixaria `static/` e o logo de fora.
+  Alternativa a avaliar aqui: mover `static/` para dentro do pacote.
+- `.dockerignore`, build reproduzível a partir do `uv.lock`.
+- Verificação: subir o container localmente, gerar um PDF e conferir as páginas.
+
+Commit: `chore: empacota o serviço em container`.
+
+## Etapa 8 — Servidor web, nuvem e segurança
+
+Decisões de operação, todas ainda em aberto:
+
+- **Servidor**: `uvicorn` sozinho ou atrás de um proxy reverso (nginx, Caddy,
+  Traefik); número de workers; timeouts.
+- **Nuvem**: escolher o destino (VPS, Fly.io, Render, Cloud Run…) pesando custo,
+  facilidade e limites de CPU — a geração de PDF é trabalho de CPU, não de I/O.
+- **Segurança**, vinculada às escolhas acima:
+  - TLS e redirecionamento de HTTP para HTTPS;
+  - limite de taxa por IP: gerar 500 folhas é caro, e a rota é aberta e sem
+    autenticação — é o vetor de abuso mais óbvio do serviço;
+  - limite de tamanho do corpo da requisição (lista de palavras e, se a Etapa 6.1.3
+    ficar pronta, a imagem enviada);
+  - validação estrita da imagem enviada, se houver upload;
+  - cabeçalhos de segurança e política de CORS (hoje desnecessária, porque
+    frontend e API são a mesma origem);
+  - teto de trabalho por requisição (`MAX_FOLHAS`, `MAX_CELULAS` já existem em
+    `src/bingo/models.py`) e timeout de geração.
+
+Commit: `chore: configuração de servidor e implantação`.
+
+## Etapa 9 — Documentação
+
+Escrita depois que o container e o servidor estiverem definidos, para descrever o
+que de fato existe.
+
+`README.md` com: o que é, como rodar localmente
+(`uv run uvicorn bingo.api:app --reload`), como rodar os testes (`uv run pytest`),
+como construir e executar o container, e como está implantado.
 
 Commit: `docs: README com instruções de uso e deploy`.
 
