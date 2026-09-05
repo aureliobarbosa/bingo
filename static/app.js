@@ -180,8 +180,12 @@ function ajustarCentroLivre() {
   const impares = inteiro(el.linhas) % 2 === 1 && inteiro(el.colunas) % 2 === 1;
   el.centroLivre.disabled = !impares;
   if (!impares) el.centroLivre.checked = false;
-  // Sem célula central não há onde pôr o logo.
-  el.btnLogo.disabled = !el.centroLivre.checked;
+  // Sem célula central não há onde pôr o logo. O botão é um <label>, que não
+  // tem `disabled`: desabilita-se o input e marca-se o label como inativo.
+  const podeEnviar = el.centroLivre.checked;
+  el.arquivoLogo.disabled = !podeEnviar;
+  el.btnLogo.classList.toggle("disabled", !podeEnviar);
+  el.btnLogo.setAttribute("aria-disabled", String(!podeEnviar));
 }
 
 function alternarTipo() {
@@ -390,7 +394,6 @@ el.form.addEventListener("change", aoMudar);
 el.btnBaixar.addEventListener("click", baixar);
 el.btnSortear.addEventListener("click", atualizarPreview);
 el.btnTema.addEventListener("click", alternarTema);
-el.btnLogo.addEventListener("click", () => el.arquivoLogo.click());
 el.arquivoLogo.addEventListener("change", aoEscolherLogo);
 
 aplicarTema(temaInicial());
