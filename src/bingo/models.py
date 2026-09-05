@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 TipoBingo = Literal["numeros", "palavras"]
+OpcaoLogo = Literal["padrao", "nenhum"]
 
 MAX_CELULAS = 100
 MAX_FOLHAS = 500
@@ -24,6 +25,7 @@ class ConfiguracaoJogo:
     colunas: int = 5
     numero_folhas: int = 10
     centro_livre: bool = True
+    logo: OpcaoLogo = "padrao"
     titulo: str = "BINGO"
     subtitulo: str = ""
 
@@ -62,6 +64,9 @@ class ConfiguracaoJogo:
         """Levanta ValueError com mensagem em português na primeira regra violada."""
         if self.tipo not in ("numeros", "palavras"):
             raise ValueError("Tipo de bingo deve ser 'numeros' ou 'palavras'.")
+
+        if self.logo not in ("padrao", "nenhum"):
+            raise ValueError("Opção de logo deve ser 'padrao' ou 'nenhum'.")
 
         if self.linhas < 1 or self.colunas < 1:
             raise ValueError("A grade precisa ter ao menos uma linha e uma coluna.")
