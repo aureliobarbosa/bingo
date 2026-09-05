@@ -1,8 +1,8 @@
 # Sistema de Bingo via Web — Plano de Implementação
 
-> **Andamento** — Etapas 0 a 6 concluídas (backend, PDF, API, interface e conexão),
-> mais o logo na célula central. Pendentes: 6.1 (refinamentos, sete itens),
-> 7 (container), 8 (servidor, nuvem e segurança) e 9 (documentação).
+> **Andamento** — Etapas 0 a 7 concluídas: backend, PDF, API, interface, conexão,
+> os refinamentos de 6.1 e o container. Pendentes: 8 (servidor, nuvem e
+> segurança) e 9 (documentação).
 
 ## Contexto
 
@@ -395,21 +395,35 @@ Commit por item, como nas demais etapas.
 
 **Parar aqui e pedir avaliação do usuário.**
 
-## Etapa 7 — Container
+## Etapa 7 — Container — **concluída**
 
-Empacotar o serviço em uma imagem, que é o artefato que as etapas seguintes
-publicam.
+`Dockerfile` com três estágios e um `.devcontainer/devcontainer.json` que aponta
+para o de desenvolvimento, de modo que o ambiente de trabalho e o de produção
+saiam da mesma receita.
 
-- `Dockerfile` com `uv` para instalar as dependências, executando como usuário sem
-  privilégios e expondo `uvicorn`.
-- Incluir o diretório `static/` na imagem: hoje `RAIZ_PROJETO` é calculada a partir
-  do arquivo-fonte (`src/bingo/pdf.py`, `parents[2]`), então a imagem precisa copiar
-  a árvore do projeto — instalar apenas o wheel deixaria `static/` e o logo de fora.
-  Alternativa a avaliar aqui: mover `static/` para dentro do pacote.
-- `.dockerignore`, build reproduzível a partir do `uv.lock`.
-- Verificação: subir o container localmente, gerar um PDF e conferir as páginas.
+| Estágio | Base | Para quê |
+|---|---|---|
+| `desenvolvimento` | imagem do `uv` | devcontainer: código montado, grupo dev, `--reload` |
+| `construcao` | imagem do `uv` | monta o ambiente a partir do `uv.lock` |
+| `producao` | `python:3.14-slim` | recebe só o `.venv` pronto, `src/` e `static/` |
 
-Commit: `chore: empacota o serviço em container`.
+**Decisões tomadas na execução:**
+
+- **`static/` continua fora do pacote**, e a imagem copia a árvore do projeto.
+  Confirmado na prática: `uv build` gera um wheel com apenas os cinco módulos de
+  `src/bingo`, sem `index.html`, `app.js` nem o logo. Mover `static/` para dentro
+  do pacote foi descartado por não trazer ganho.
+- **Produção não tem `uv`**: o ambiente é montado no estágio `construcao` e
+  copiado pronto. Tirou 77 MB (459 MB → 382 MB) e reduz a superfície de ataque.
+- **No desenvolvimento o ambiente vive em `/opt/venv`**, fora do diretório
+  montado. Dentro dele, o `.venv` do host apareceria por cima do ambiente do
+  container, com caminhos absolutos que não valem lá.
+- Roda como usuário sem privilégios (uid 1000) e tem `HEALTHCHECK`.
+
+**Verificado:** os 52 testes passam dentro do estágio de desenvolvimento com o
+código montado; em produção o container serve `/`, `/static/images/logo.jpeg` e
+gera um PDF de 5 páginas com o logo na célula central; o healthcheck reporta
+`healthy`.
 
 ## Etapa 8 — Servidor web, nuvem e segurança
 

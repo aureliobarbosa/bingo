@@ -16,6 +16,15 @@ uv run pytest -q                           # 52 testes
 uv run uvicorn bingo.api:app --reload      # http://127.0.0.1:8000
 ```
 
+Em container (mesma receita para os dois ambientes):
+
+```bash
+docker build --target producao -t bingo:producao .   # imagem de produção
+docker run -p 8000:8000 bingo:producao
+```
+
+O `.devcontainer/` aponta para o estágio `desenvolvimento` do mesmo `Dockerfile`.
+
 ## Convenções de trabalho
 
 - **Trunk Based Development**: trabalhar sempre em `main`, sem branches.
@@ -74,8 +83,12 @@ navegador (chaves `bingo.configuracao` e `bingo.tema`).
 - **Ao verificar a interface, medir o efeito, não a intenção**: `getComputedStyle`
   em vez de ler de volta a propriedade que o próprio código acabou de escrever.
 - **`RAIZ_PROJETO`** (em `src/bingo/pdf.py`) é calculada a partir do arquivo-fonte,
-  então `static/` precisa acompanhar a árvore do projeto — instalar apenas o wheel
-  deixaria o diretório e o logo de fora. Isso é decisão da Etapa 7 (container).
+  então `static/` precisa acompanhar a árvore do projeto — um wheel traz apenas os
+  módulos de `src/bingo`, sem `index.html`, `app.js` nem o logo. Por isso a imagem
+  copia `src/` e `static/` em vez de instalar o pacote sozinho.
+- **No container de desenvolvimento o ambiente fica em `/opt/venv`**, fora do
+  diretório montado: dentro dele o `.venv` do host apareceria por cima, com
+  caminhos absolutos que não valem no container.
 - **O navegador guarda `static/` em cache.** `StaticFiles` serve sem versão na URL
   nem cabeçalho de cache, então depois de editar `app.js` o navegador pode
   continuar rodando a versão antiga — o que já levou a diagnósticos errados. Ao
