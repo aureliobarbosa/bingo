@@ -1,8 +1,8 @@
 # Sistema de Bingo via Web — Plano de Implementação
 
 > **Andamento** — Etapas 0 a 7 concluídas: backend, PDF, API, interface, conexão,
-> os refinamentos de 6.1 e o container. Pendentes: 8 (servidor, nuvem e
-> segurança) e 9 (documentação).
+> os refinamentos de 6.1 e o container. Pendentes: 8.1 (integração contínua),
+> 8.2 (publicação no Cloud Run), 8.3 (cache e segurança) e 9 (documentação).
 
 ## Contexto
 
@@ -425,32 +425,82 @@ código montado; em produção o container serve `/`, `/static/images/logo.jpeg`
 gera um PDF de 5 páginas com o logo na célula central; o healthcheck reporta
 `healthy`.
 
-## Etapa 8 — Servidor web, nuvem e segurança
+## Etapa 8 — Integração contínua e publicação
 
-Decisões de operação, todas ainda em aberto:
+### Carga esperada, que sustenta as decisões abaixo
 
-- **Servidor**: `uvicorn` sozinho ou atrás de um proxy reverso (nginx, Caddy,
-  Traefik); número de workers; timeouts.
+Um professor usa o gerador cerca de 10 vezes por ano. Com 100 professores são
+1.000 sessões por ano, ou **2,7 por dia** — algo como 0,002 requisição por
+segundo. Os alunos **não acessam o serviço**: recebem papel impresso. Somado ao
+que foi medido no container (47 MB de memória, 0,38 s para gerar 100 folhas), o
+dimensionamento é trivial: um único processo `uvicorn` atende com folga de várias
+ordens de grandeza.
+
+### 8.1 Integração contínua — **fazer antes do deploy**
+
+`.github/workflows/ci.yml`, disparado em push para `main` e em pull requests:
+
+- **testes** — `astral-sh/setup-uv` com cache, `uv sync --frozen`,
+  `uv run pytest -q`;
+- **imagem** — constrói o estágio `producao` do `Dockerfile` sem publicar, com
+  cache de camadas do próprio Actions, para que uma quebra no container apareça
+  aqui e não no meio da configuração do Cloud Run.
+
+Confirmar as versões correntes das actions antes de escrever o arquivo.
+
+Commit: `chore: integração contínua no GitHub Actions`.
+
+### 8.2 Publicação no Google Cloud Run
+
+**Decisão tomada**, com as alternativas avaliadas e descartadas:
+
+| Opção | Por que não |
+|---|---|
+| Hugging Face Spaces | Sem cartão e o mais fácil de publicar, mas lido como vitrine de demonstração; perde valor como peça de portfólio |
+| Render | Dorme em ~15 min e acorda em dezenas de segundos — péssimo para quem abre o link uma vez por mês |
+| Azure Container Apps | Equivalente ao Cloud Run, sem vantagem que justifique a troca |
+| Fly.io | Modelo gratuito mudou ao longo dos anos; incerto |
+| Oracle Always Free | Sempre ligada, mas exige administrar TLS, firewall e atualizações |
+
+Pesou também um critério não técnico: o projeto serve de **portfólio**, e o Cloud
+Run comunica competência de operação que uma plataforma de demonstração não
+comunica. Vale lembrar, porém, que o diferencial de portfólio não é a plataforma
+e sim o que existe em volta — CI, salvaguardas de custo e o registro das decisões.
+
+Trabalho previsto:
+
+1. **Respeitar a variável `PORT`** — o Cloud Run injeta 8080 e o `CMD` fixa 8000.
+   É a única mudança de código desta etapa.
+2. **Autenticar o Actions por Workload Identity Federation**, sem chave de conta
+   de serviço guardada no repositório.
+3. Publicar no **Artifact Registry** e implantar no Cloud Run, região
+   `southamerica-east1`.
+4. **Salvaguardas**, dimensionadas pelo que foi medido: `--memory 256Mi`,
+   `--cpu 1`, `--max-instances` baixo, timeout de requisição e alerta de
+   orçamento na conta — para que uma anomalia de tráfego não vire fatura.
+
+Verificação: abrir a URL pública, gerar um PDF, conferir páginas e logo, e medir
+a partida a frio real.
+
+Commit: `chore: publica o serviço no Cloud Run`.
+
+### 8.3 Segurança e cache
+
+- **nginx está descartado.** Ele não substitui o `uvicorn` — não executa Python;
+  seria um proxy *na frente* dele. A plataforma já entrega TLS, domínio e
+  roteamento, e a carga projetada dispensa qualquer proxy. Só voltaria a fazer
+  sentido numa VPS administrada por nós.
 - **Cache dos arquivos estáticos**: `/static/*` é servido sem versão na URL nem
-  cabeçalho de cache, então o navegador continua executando o `app.js` antigo
-  depois de um deploy. Durante o desenvolvimento isso já obrigou a limpar o cache
-  e reiniciar o navegador para ver uma correção. Resolver com versão na URL
-  (`/static/app.js?v=…`) ou cabeçalhos de cache adequados.
-- **Nuvem**: escolher o destino (VPS, Fly.io, Render, Cloud Run…) pesando custo,
-  facilidade e limites de CPU — a geração de PDF é trabalho de CPU, não de I/O.
-- **Segurança**, vinculada às escolhas acima:
-  - TLS e redirecionamento de HTTP para HTTPS;
-  - limite de taxa por IP: gerar um jogo cheio é caro, e a rota é aberta e sem
-    autenticação — é o vetor de abuso mais óbvio do serviço;
-  - limite de tamanho do corpo da requisição (lista de palavras e, se a Etapa 6.1.3
-    ficar pronta, a imagem enviada);
-  - validação estrita da imagem enviada, se houver upload;
-  - cabeçalhos de segurança e política de CORS (hoje desnecessária, porque
-    frontend e API são a mesma origem);
-  - teto de trabalho por requisição (`MAX_FOLHAS`, `MAX_CELULAS` já existem em
-    `src/bingo/models.py`) e timeout de geração.
+  cabeçalho de cache. Enquanto era só desenvolvimento, o incômodo era limpar o
+  cache do navegador; **com deploy, vira defeito** — usuários continuariam
+  rodando o `app.js` antigo depois de uma correção. Resolver com versão na URL
+  (`/static/app.js?v=…`) ou cabeçalhos adequados.
+- Limite de taxa por IP: gerar um jogo cheio é o pedido mais caro, e a rota é
+  aberta e sem autenticação — é o vetor de abuso mais óbvio.
+- Limite de tamanho do corpo da requisição, cabeçalhos de segurança e timeout de
+  geração. CORS segue desnecessário: frontend e API são a mesma origem.
 
-Commit: `chore: configuração de servidor e implantação`.
+Commit: `chore: cache dos estáticos e limites de segurança`.
 
 ## Etapa 9 — Documentação
 
@@ -486,6 +536,22 @@ Depois, no navegador em `http://127.0.0.1:8000`:
 
 Trunk Based Development: tudo direto em `main`, sem branches. Um commit por
 etapa (funcionalidade + seus testes juntos), com as mensagens indicadas acima.
+
+### Trabalhar em mais de uma máquina
+
+O desenvolvimento acontece em duas máquinas (laptop e desktop).
+
+- O **git é a fonte de verdade**. `.venv`, imagens Docker e o `localStorage` do
+  navegador não viajam — e não precisam.
+- Ao começar: `git pull` e `uv sync --frozen`. Ao terminar: **sempre `git push`**,
+  senão o trabalho fica preso numa máquina.
+- Quem alterar dependências **commita o `uv.lock` junto**; é ele que garante o
+  mesmo ambiente dos dois lados.
+- O `.devcontainer/` dá ambiente idêntico nas duas máquinas, sem depender do que
+  está instalado no sistema.
+- O contexto de trabalho viaja em `CLAUDE.md` e `docs/PLANO.md`. **O histórico da
+  conversa não viaja** — por isso toda decisão relevante é registrada num desses
+  dois arquivos antes de trocar de máquina.
 
 ---
 

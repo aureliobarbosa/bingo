@@ -25,6 +25,10 @@ docker run -p 8000:8000 bingo:producao
 
 O `.devcontainer/` aponta para o estágio `desenvolvimento` do mesmo `Dockerfile`.
 
+O backend de build é o **`uv_build`**, embutido no próprio `uv`. O bloco
+`[build-system]` existe porque o layout `src/` precisa dele para o projeto ser
+instalado no ambiente (em modo editável) — **não** para publicar nada no PyPI.
+
 ## Convenções de trabalho
 
 - **Trunk Based Development**: trabalhar sempre em `main`, sem branches.
@@ -57,6 +61,12 @@ O serviço é **stateless**: cada requisição traz a configuração completa e 
 um PDF. Nada é salvo no servidor; a última configuração fica no `localStorage` do
 navegador (chaves `bingo.configuracao` e `bingo.tema`).
 
+O logo enviado pelo usuário viaja como **data URI dentro do JSON**, e não em
+`multipart/form-data`: assim o serviço continua stateless, é uma requisição só e
+as duas rotas mantêm o mesmo contrato. Ele **não** é gravado no `localStorage` —
+alguns MB estourariam a cota e derrubariam o resto da configuração salva. Por
+isso, ao recarregar a página, o logo volta a ser o padrão.
+
 ## Decisões de produto já fechadas
 
 - Grade de linhas × colunas configuráveis; célula central livre só quando ambas
@@ -71,6 +81,16 @@ navegador (chaves `bingo.configuracao` e `bingo.tema`).
 - Textos com espaço são quebrados em duas linhas, **no espaço mais próximo do
   centro** — sem isso a fonte da folha inteira encolhe por causa do nome mais
   longo.
+- **Logo enviado**: só PNG ou JPEG, no máximo 2 MB e 25 megapixels. O limite de
+  tamanho existe porque o data URI trafega inteiro a cada atualização do preview;
+  o de megapixels trava a imagem pequena que descomprime enorme. `models.py`
+  valida o que é barato (cabeçalho do data URI e comprimento do base64) e
+  `pdf.py` o que exige abrir a imagem. A margem clara em volta do logo é
+  recortada na geração, senão o desenho ocupa ~60% da célula.
+- **Número de folhas limitado por C(n, k)**, o total de folhas distintas que o
+  universo permite: `combinacoes_possiveis` e `maximo_folhas` em `models.py`. O
+  JavaScript refaz a conta saturando o produto em `MAX_FOLHAS`, o que dispensa
+  `BigInt`. A regra só morde em universos pequenos.
 
 ## Armadilhas já encontradas
 
@@ -95,10 +115,33 @@ navegador (chaves `bingo.configuracao` e `bingo.tema`).
   conferir uma mudança na interface, recarregue ignorando o cache
   (`Ctrl+Shift+R`) ou use uma janela anônima. A correção definitiva é decisão da
   Etapa 8.
+- **`MAX_FOLHAS` está em três lugares** e precisam mudar juntos:
+  `src/bingo/models.py`, a constante no topo de `static/app.js` e o atributo `max`
+  do campo em `static/index.html`.
+- **Input de arquivo: limpar `value` depois de ler.** Sem isso, escolher o mesmo
+  arquivo outra vez não dispara `change` e a interface parece morta — isso já
+  custou uma sessão inteira de diagnóstico. E **não aninhe o `<input>` dentro do
+  `<label>`** que serve de botão: o clique borbulha de volta ao label, que o
+  reencaminha, e o comportamento varia entre navegadores.
+- **`restaurar()` (em `static/app.js`) não pode lançar.** Se lançar, a
+  inicialização morre no meio — sem preview, sem eventos ligados e sem saída pela
+  interface, já que não existe botão de restaurar padrões (dispensado no item
+  6.1.4 do plano, com o motivo registrado lá).
 - **Chrome headless não renderiza PDF** dentro de `iframe`; o `iframe` aparece
   preto nos screenshots mesmo com tudo funcionando. Verifique pelo DOM
   (`preview.src` começa com `blob:`). **Firefox headless não roda neste ambiente**
   (trava até o timeout, inclusive em `about:blank`).
+
+## Desempenho medido
+
+Medidas do container de produção, úteis para dimensionar hospedagem:
+
+| Medida | Valor |
+|---|---|
+| Memória em uso | 47 MB |
+| Partida a frio até responder | 2,8 s |
+| Gerar 100 folhas (o pedido mais caro) | 0,38 s |
+| Imagem de produção | 382 MB |
 
 ## Verificação da interface sem navegador interativo
 
