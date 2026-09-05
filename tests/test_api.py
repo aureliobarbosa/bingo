@@ -76,3 +76,16 @@ def test_logo_invalido_vira_422_em_portugues():
     )
     assert r.status_code == 422
     assert "PNG ou JPEG" in r.json()["detail"]
+
+
+def test_folhas_acima_das_combinacoes_vira_422():
+    r = client.post(
+        "/api/jogo",
+        json={
+            "tipo": "palavras",
+            "palavras": [f"p{i}" for i in range(9)],
+            "linhas": 3, "colunas": 3, "centro_livre": True, "numero_folhas": 10,
+        },
+    )
+    assert r.status_code == 422
+    assert "apenas 9 folhas distintas" in r.json()["detail"]

@@ -2,7 +2,7 @@
 
 import pytest
 
-from bingo.models import ConfiguracaoJogo
+from bingo.models import MAX_FOLHAS, ConfiguracaoJogo
 
 PALAVRAS = tuple(f"palavra{i}" for i in range(20))
 
@@ -108,3 +108,41 @@ def test_logo_acima_do_limite_de_tamanho():
 def test_data_uri_malformado():
     with pytest.raises(ValueError, match="formato reconhecido"):
         ConfiguracaoJogo(logo_enviado="data:image/png;base64")
+
+
+PALAVRAS_9 = tuple(f"p{i}" for i in range(9))
+
+
+def _cfg_9_em_3x3(numero_folhas: int) -> ConfiguracaoJogo:
+    """9 palavras numa grade 3x3 com centro livre: 8 por folha, C(9,8) = 9."""
+    return ConfiguracaoJogo(
+        tipo="palavras", palavras=PALAVRAS_9, linhas=3, colunas=3,
+        centro_livre=True, numero_folhas=numero_folhas,
+    )
+
+
+def test_combinacoes_possiveis_usa_a_formula_da_combinacao():
+    cfg = _cfg_9_em_3x3(1)
+    assert cfg.elementos_por_folha == 8
+    assert cfg.combinacoes_possiveis == 9  # C(9, 8)
+    assert cfg.maximo_folhas == 9
+
+
+def test_numero_de_folhas_no_limite_e_aceito():
+    assert _cfg_9_em_3x3(9).numero_folhas == 9
+
+
+def test_pedir_mais_folhas_do_que_existem_combinacoes():
+    with pytest.raises(ValueError, match="apenas 9 folhas distintas"):
+        _cfg_9_em_3x3(10)
+
+
+def test_universo_grande_e_limitado_pelo_teto_do_servico():
+    """Com 75 números em 5x5 as combinações são astronômicas: quem limita é MAX_FOLHAS."""
+    import math
+
+    cfg = ConfiguracaoJogo(
+        numero_elementos=75, linhas=5, colunas=5, centro_livre=True, numero_folhas=500
+    )
+    assert cfg.combinacoes_possiveis == math.comb(75, 24)
+    assert cfg.maximo_folhas == MAX_FOLHAS

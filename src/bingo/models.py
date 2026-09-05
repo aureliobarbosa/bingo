@@ -1,5 +1,6 @@
 """Configuração de um jogo de bingo e suas regras de validação."""
 
+import math
 from dataclasses import dataclass
 from typing import Literal
 
@@ -55,6 +56,24 @@ class ConfiguracaoJogo:
         return self.palavras
 
     @property
+    def combinacoes_possiveis(self) -> int:
+        """Quantas folhas distintas o universo permite formar.
+
+        Folhas são comparadas como conjuntos: os mesmos elementos em ordens
+        diferentes são a mesma folha. Daí a combinação C(n, k) = n! / (k!(n-k)!),
+        com n = elementos disponíveis e k = elementos sorteados por folha.
+        """
+        disponiveis = len(self.universo)
+        if disponiveis <= self.elementos_por_folha:
+            return 0
+        return math.comb(disponiveis, self.elementos_por_folha)
+
+    @property
+    def maximo_folhas(self) -> int:
+        """Maior número de folhas aceitável: o que o universo permite, com teto."""
+        return min(MAX_FOLHAS, self.combinacoes_possiveis)
+
+    @property
     def indice_centro(self) -> int | None:
         """Posição da célula central na ordem de leitura, ou None."""
         if not self.centro_livre:
@@ -102,6 +121,16 @@ class ConfiguracaoJogo:
             raise ValueError(
                 f"O número de elementos ({disponiveis}) deve ser maior que os "
                 f"elementos por folha ({self.elementos_por_folha})."
+            )
+
+        # Não adianta pedir mais folhas do que existem combinações distintas.
+        # Só morde em universos pequenos: acima de 500 combinações quem limita
+        # é MAX_FOLHAS, já validado acima.
+        combinacoes = self.combinacoes_possiveis
+        if self.numero_folhas > combinacoes:
+            raise ValueError(
+                f"Com {disponiveis} elementos e {self.elementos_por_folha} por "
+                f"folha existem apenas {combinacoes} folhas distintas possíveis."
             )
 
     def _validar_logo(self) -> None:
