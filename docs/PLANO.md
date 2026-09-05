@@ -379,8 +379,17 @@ chave de comparação, não como substituto.
 Avaliar também o `universo` em `ConfiguracaoJogo`: a checagem de palavras repetidas
 já constrói um `set` a cada validação.
 
-Refatoração posterior, sem pressa: fazer depois que 6.1.5 e 6.1.6 estiverem prontos,
-com os testes existentes servindo de rede de segurança.
+**Concluído.** A avaliação mostrou que o `frozenset` só teria valor se o gerador
+passasse a evitar folhas repetidas — e a medição mostrou que ele precisa: com 12
+palavras numa grade 3x3, **64% dos jogos saíam com duas cartelas idênticas**, e com
+9 palavras, 100%. Duas cartelas iguais significam dois vencedores simultâneos com a
+mesma jogada. Em bingos de números a repetição nunca ocorre, porque as combinações
+são astronômicas.
+
+`gerar_jogo` passou a comparar as folhas por `frozenset` e re-sortear as iguais,
+mantendo a tupla ordenada como representação — a ordem define a posição na grade.
+O limite C(n, k) da 6.1.5 é o que torna isso seguro; há ainda um teto de tentativas
+como trava. Custo medido: 2,1 ms no pior caso (100 folhas de 75 números).
 
 Commit por item, como nas demais etapas.
 

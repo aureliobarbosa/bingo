@@ -12,7 +12,7 @@ O plano completo, com as etapas já feitas e as pendentes, está em
 
 ```bash
 uv sync                                    # cria o ambiente (baixa o Python 3.14)
-uv run pytest -q                           # 49 testes
+uv run pytest -q                           # 52 testes
 uv run uvicorn bingo.api:app --reload      # http://127.0.0.1:8000
 ```
 
@@ -35,7 +35,7 @@ uv run uvicorn bingo.api:app --reload      # http://127.0.0.1:8000
 | Arquivo | Responsabilidade |
 |---|---|
 | `src/bingo/models.py` | `ConfiguracaoJogo`: dataclass imutável que valida no `__post_init__` e expõe `elementos_por_folha`, `universo`, `indice_centro` |
-| `src/bingo/gerador.py` | `gerar_jogo(cfg)` → tupla de folhas; cada folha é uma tupla de células em ordem de leitura, com `None` no centro livre |
+| `src/bingo/gerador.py` | `gerar_jogo(cfg)` → tupla de folhas distintas; cada folha é uma tupla de células em ordem de leitura, com `None` no centro livre |
 | `src/bingo/pdf.py` | Desenho em A4 retrato; `desenhar_folha` é compartilhada por `gerar_pdf_folha` e `gerar_pdf_jogo` |
 | `src/bingo/api.py` | Rotas `POST /api/preview` (uma folha) e `POST /api/jogo` (PDF completo), `/` e `/static` |
 | `static/app.js` | Todo o tráfego HTTP passa pelo objeto `Api`; o resto da interface não conhece o servidor |
@@ -53,7 +53,10 @@ navegador (chaves `bingo.configuracao` e `bingo.tema`).
 - Grade de linhas × colunas configuráveis; célula central livre só quando ambas
   forem ímpares, e ela recebe o logo (`static/images/logo.jpeg`).
 - Download é um **PDF único multi-página**, uma folha por página.
-- Sorteio simples com `random.sample`, sem semente e sem checar folhas repetidas.
+- Sorteio com `random.sample`, sem semente, mas **sem folhas repetidas** dentro de
+  um jogo: `gerar_jogo` compara as folhas por `frozenset` e re-sorteia as iguais.
+  A folha continua uma tupla ordenada, porque a ordem define a posição na grade.
+  Sem isso, um bingo de 12 palavras saía com cartelas idênticas em 64% dos jogos.
 - Preview mostra **apenas a primeira folha**, com debounce de 400 ms.
 - Bingo de palavras: uma palavra por linha num `<textarea>`.
 - Textos com espaço são quebrados em duas linhas, **no espaço mais próximo do

@@ -48,3 +48,30 @@ def test_bingo_de_palavras():
     for folha in folhas:
         assert len(folha) == 9
         assert {c for c in folha if c is not None} <= set(PALAVRAS)
+
+
+def test_jogo_nao_repete_folhas_mesmo_com_universo_apertado():
+    """Com 9 palavras numa grade 3x3 só existem 9 folhas: todas devem sair uma vez."""
+    cfg = ConfiguracaoJogo(
+        tipo="palavras", palavras=tuple(f"p{i}" for i in range(9)),
+        linhas=3, colunas=3, centro_livre=True, numero_folhas=9,
+    )
+    folhas = gerar_jogo(cfg)
+    identidades = {frozenset(c for c in folha if c is not None) for folha in folhas}
+    assert len(identidades) == 9
+
+
+def test_folhas_com_os_mesmos_elementos_em_outra_ordem_contam_como_iguais():
+    from bingo.gerador import _identidade
+
+    assert _identidade(("a", "b", None, "c")) == _identidade(("c", None, "a", "b"))
+
+
+def test_jogo_grande_continua_sem_repetir():
+    cfg = ConfiguracaoJogo(
+        tipo="palavras", palavras=tuple(f"p{i}" for i in range(12)),
+        linhas=3, colunas=3, centro_livre=True, numero_folhas=30,
+    )
+    folhas = gerar_jogo(cfg)
+    identidades = {frozenset(c for c in folha if c is not None) for folha in folhas}
+    assert len(identidades) == 30
