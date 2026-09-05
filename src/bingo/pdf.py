@@ -1,5 +1,6 @@
 """Desenho das folhas de bingo em PDF (A4 retrato, uma folha por página)."""
 
+import base64
 import io
 from functools import lru_cache
 from pathlib import Path
@@ -80,29 +81,56 @@ def caixa_do_conteudo(imagem: Image.Image) -> tuple[int, int, int, int] | None:
     return mascara.getbbox()
 
 
-@lru_cache(maxsize=8)
-def _logo_recortado(caminho: str, versao: float) -> ImageReader:
-    """Logo sem a margem em volta, pronto para o reportlab.
-
-    O resultado fica em cache: um jogo de 500 folhas abre o arquivo uma vez só.
-    `versao` é o mtime do arquivo e serve para invalidar o cache se ele mudar.
-    """
-    with Image.open(caminho) as arquivo:
-        imagem = arquivo.convert("RGB")
+def _sem_margem(imagem: Image.Image) -> ImageReader:
+    """Descarta a margem clara em volta e entrega a imagem ao reportlab."""
     caixa = caixa_do_conteudo(imagem)
     if caixa:
         imagem = imagem.crop(caixa)
     return ImageReader(imagem)
 
 
-def _desenhar_logo(c: canvas.Canvas, x: float, y: float, lado: float) -> bool:
-    """Desenha o logo na célula central. Devolve False se não houver arquivo."""
-    if not LOGO_PADRAO.is_file():
+@lru_cache(maxsize=8)
+def _logo_do_arquivo(caminho: str, versao: float) -> ImageReader:
+    """Logo padrão, lido do disco.
+
+    O resultado fica em cache: um jogo de 500 folhas abre o arquivo uma vez só.
+    `versao` é o mtime do arquivo e serve para invalidar o cache se ele mudar.
+    """
+    with Image.open(caminho) as arquivo:
+        return _sem_margem(arquivo.convert("RGB"))
+
+
+@lru_cache(maxsize=2)
+def _logo_enviado(data_uri: str) -> ImageReader:
+    """Logo que veio na requisição, como data URI (`data:image/png;base64,...`)."""
+    _, _, dados = data_uri.partition(",")
+    try:
+        with Image.open(io.BytesIO(base64.b64decode(dados, validate=True))) as arquivo:
+            return _sem_margem(arquivo.convert("RGB"))
+    except Exception as erro:
+        raise ValueError("Não foi possível ler a imagem enviada como logo.") from erro
+
+
+def _logo_para_desenho(cfg: ConfiguracaoJogo) -> ImageReader | None:
+    """Imagem a desenhar na célula central: a enviada, ou a padrão do projeto."""
+    if cfg.logo_enviado:
+        return _logo_enviado(cfg.logo_enviado)
+    if LOGO_PADRAO.is_file():
+        return _logo_do_arquivo(str(LOGO_PADRAO), LOGO_PADRAO.stat().st_mtime)
+    return None
+
+
+def _desenhar_logo(
+    c: canvas.Canvas, cfg: ConfiguracaoJogo, x: float, y: float, lado: float
+) -> bool:
+    """Desenha o logo na célula central. Devolve False se não houver imagem."""
+    logo = _logo_para_desenho(cfg)
+    if logo is None:
         return False
     tamanho = lado * PROPORCAO_LOGO
     borda = (lado - tamanho) / 2
     c.drawImage(
-        _logo_recortado(str(LOGO_PADRAO), LOGO_PADRAO.stat().st_mtime),
+        logo,
         x + borda,
         y + borda,
         width=tamanho,
@@ -166,7 +194,7 @@ def desenhar_folha(
 
         if texto is None:
             # A célula central recebe o logo; sem arquivo de logo, fica cinza.
-            if not _desenhar_logo(c, x, y, lado):
+            if not _desenhar_logo(c, cfg, x, y, lado):
                 c.setFillGray(CINZA_CENTRO)
                 c.rect(x, y, lado, lado, stroke=0, fill=1)
                 c.setFillGray(0)

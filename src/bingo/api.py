@@ -28,6 +28,7 @@ class ConfiguracaoIn(BaseModel):
     colunas: int = Field(default=5, ge=1, le=20)
     numero_folhas: int = Field(default=10, ge=1, le=MAX_FOLHAS)
     centro_livre: bool = True
+    logo_enviado: str = ""
     titulo: str = Field(default="BINGO", max_length=80)
     subtitulo: str = Field(default="", max_length=120)
 
@@ -41,6 +42,7 @@ class ConfiguracaoIn(BaseModel):
             colunas=self.colunas,
             numero_folhas=self.numero_folhas,
             centro_livre=self.centro_livre,
+            logo_enviado=self.logo_enviado,
             titulo=self.titulo.strip(),
             subtitulo=self.subtitulo.strip(),
         )

@@ -53,6 +53,9 @@ const el = {
   linhas: document.getElementById("linhas"),
   colunas: document.getElementById("colunas"),
   centroLivre: document.getElementById("centro_livre"),
+  btnLogo: document.getElementById("btn-logo"),
+  arquivoLogo: document.getElementById("arquivo_logo"),
+  rotuloLogo: document.getElementById("rotulo-logo"),
   numeroFolhas: document.getElementById("numero_folhas"),
   campoNumeros: document.getElementById("campo-numeros"),
   campoPalavras: document.getElementById("campo-palavras"),
@@ -71,6 +74,11 @@ const el = {
 
 const CHAVE_ARMAZENAMENTO = "bingo.configuracao";
 const CHAVE_TEMA = "bingo.tema";
+const LOGO_PADRAO = "logo.jpeg";
+
+/* Imagem enviada pelo usuário. Fica só em memória: um data URI de alguns MB
+ * estouraria a cota do localStorage e derrubaria o resto da configuração. */
+let logoEnviado = { nome: LOGO_PADRAO, dados: "" };
 let urlAtual = null;
 
 /* ------------------------------------------------------------ configuração */
@@ -100,6 +108,7 @@ function lerFormulario() {
     colunas: inteiro(el.colunas),
     numero_folhas: inteiro(el.numeroFolhas),
     centro_livre: el.centroLivre.checked && !el.centroLivre.disabled,
+    logo_enviado: logoEnviado.dados,
     titulo: el.titulo.value,
     subtitulo: el.subtitulo.value,
   };
@@ -171,6 +180,8 @@ function ajustarCentroLivre() {
   const impares = inteiro(el.linhas) % 2 === 1 && inteiro(el.colunas) % 2 === 1;
   el.centroLivre.disabled = !impares;
   if (!impares) el.centroLivre.checked = false;
+  // Sem célula central não há onde pôr o logo.
+  el.btnLogo.disabled = !el.centroLivre.checked;
 }
 
 function alternarTipo() {
@@ -257,7 +268,8 @@ async function baixar() {
 
 function salvar(cfg) {
   try {
-    localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(cfg));
+    const { logo_enviado, ...semImagem } = cfg;
+    localStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(semImagem));
   } catch (erro) {
     /* Navegador sem armazenamento disponível: seguir sem lembrar. */
   }
@@ -285,6 +297,33 @@ function restaurar() {
   el.centroLivre.checked = Boolean(cfg.centro_livre);
   const radio = document.getElementById(`tipo-${cfg.tipo}`);
   if (radio) radio.checked = true;
+}
+
+/* --------------------------------------------------------------------- logo */
+
+function mostrarNomeDoLogo() {
+  el.rotuloLogo.textContent = `Logo: ${logoEnviado.nome}`;
+}
+
+function lerComoDataUri(arquivo) {
+  return new Promise((resolve, rejeitar) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(leitor.result);
+    leitor.onerror = () => rejeitar(new Error("Não foi possível ler o arquivo."));
+    leitor.readAsDataURL(arquivo);
+  });
+}
+
+async function aoEscolherLogo() {
+  const arquivo = el.arquivoLogo.files[0];
+  if (!arquivo) return;
+  try {
+    logoEnviado = { nome: arquivo.name, dados: await lerComoDataUri(arquivo) };
+    mostrarNomeDoLogo();
+    atualizarPreview();
+  } catch (erro) {
+    mostrarErro(erro.message);
+  }
 }
 
 /* --------------------------------------------------------------------- tema */
@@ -351,7 +390,10 @@ el.form.addEventListener("change", aoMudar);
 el.btnBaixar.addEventListener("click", baixar);
 el.btnSortear.addEventListener("click", atualizarPreview);
 el.btnTema.addEventListener("click", alternarTema);
+el.btnLogo.addEventListener("click", () => el.arquivoLogo.click());
+el.arquivoLogo.addEventListener("change", aoEscolherLogo);
 
 aplicarTema(temaInicial());
+mostrarNomeDoLogo();
 restaurar();
 atualizarPreview();

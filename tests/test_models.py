@@ -74,3 +74,8 @@ def test_palavras_repetidas_sao_rejeitadas():
 def test_tipo_invalido():
     with pytest.raises(ValueError, match="'numeros' ou 'palavras'"):
         ConfiguracaoJogo(tipo="letras")
+
+
+def test_logo_enviado_precisa_ser_imagem():
+    with pytest.raises(ValueError, match="precisa ser uma imagem"):
+        ConfiguracaoJogo(logo_enviado="data:text/plain;base64,bXVpdG8=")

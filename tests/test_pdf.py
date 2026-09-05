@@ -136,11 +136,46 @@ def test_logo_do_projeto_perde_a_margem_no_recorte():
     assert largura < imagem.width and altura < imagem.height
 
 
-def test_logo_recortado_fica_em_cache():
+def test_logo_do_arquivo_fica_em_cache():
     """Um jogo de muitas folhas não pode reabrir o arquivo a cada página."""
-    from bingo.pdf import LOGO_PADRAO, _logo_recortado
+    from bingo.pdf import LOGO_PADRAO, _logo_do_arquivo
 
     versao = LOGO_PADRAO.stat().st_mtime
-    assert _logo_recortado(str(LOGO_PADRAO), versao) is _logo_recortado(
+    assert _logo_do_arquivo(str(LOGO_PADRAO), versao) is _logo_do_arquivo(
         str(LOGO_PADRAO), versao
     )
+
+
+def _data_uri_de_teste() -> str:
+    """PNG com margem branca e um quadrado colorido no meio."""
+    import base64
+    import io as _io
+
+    from PIL import Image
+
+    imagem = Image.new("RGB", (300, 300), "white")
+    for x in range(90, 210):
+        for y in range(90, 210):
+            imagem.putpixel((x, y), (200, 60, 20))
+    buffer = _io.BytesIO()
+    imagem.save(buffer, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
+def test_logo_enviado_substitui_o_padrao():
+    cfg = ConfiguracaoJogo(
+        linhas=5, colunas=5, centro_livre=True, logo_enviado=_data_uri_de_teste()
+    )
+    pagina = _paginas(gerar_pdf_folha(gerar_folha(cfg), cfg))[0]
+    assert len(pagina.images) == 1
+
+
+def test_logo_enviado_ilegivel_vira_erro_em_portugues():
+    import pytest
+
+    cfg = ConfiguracaoJogo(
+        linhas=5, colunas=5, centro_livre=True,
+        logo_enviado="data:image/png;base64,bm9uc2Vuc2U=",
+    )
+    with pytest.raises(ValueError, match="ler a imagem enviada"):
+        gerar_pdf_folha(gerar_folha(cfg), cfg)

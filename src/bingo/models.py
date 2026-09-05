@@ -24,6 +24,8 @@ class ConfiguracaoJogo:
     colunas: int = 5
     numero_folhas: int = 10
     centro_livre: bool = True
+    # Imagem enviada pelo usuário, como data URI. Vazio: usa o logo padrão.
+    logo_enviado: str = ""
     titulo: str = "BINGO"
     subtitulo: str = ""
 
@@ -62,6 +64,9 @@ class ConfiguracaoJogo:
         """Levanta ValueError com mensagem em português na primeira regra violada."""
         if self.tipo not in ("numeros", "palavras"):
             raise ValueError("Tipo de bingo deve ser 'numeros' ou 'palavras'.")
+
+        if self.logo_enviado and not self.logo_enviado.startswith("data:image/"):
+            raise ValueError("O logo enviado precisa ser uma imagem.")
 
         if self.linhas < 1 or self.colunas < 1:
             raise ValueError("A grade precisa ter ao menos uma linha e uma coluna.")
