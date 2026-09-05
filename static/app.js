@@ -180,12 +180,6 @@ function ajustarCentroLivre() {
   const impares = inteiro(el.linhas) % 2 === 1 && inteiro(el.colunas) % 2 === 1;
   el.centroLivre.disabled = !impares;
   if (!impares) el.centroLivre.checked = false;
-  // Sem célula central não há onde pôr o logo. O botão é um <label>, que não
-  // tem `disabled`: desabilita-se o input e marca-se o label como inativo.
-  const podeEnviar = el.centroLivre.checked;
-  el.arquivoLogo.disabled = !podeEnviar;
-  el.btnLogo.classList.toggle("disabled", !podeEnviar);
-  el.btnLogo.setAttribute("aria-disabled", String(!podeEnviar));
 }
 
 function alternarTipo() {
@@ -318,15 +312,22 @@ function lerComoDataUri(arquivo) {
   });
 }
 
-async function aoEscolherLogo() {
+async function aoEscolherLogo(evento) {
+  // O change do input também borbulha até o form; tratar aqui é suficiente.
+  evento.stopPropagation();
   const arquivo = el.arquivoLogo.files[0];
   if (!arquivo) return;
   try {
-    logoEnviado = { nome: arquivo.name, dados: await lerComoDataUri(arquivo) };
+    const dados = await lerComoDataUri(arquivo);
+    logoEnviado = { nome: arquivo.name, dados };
     mostrarNomeDoLogo();
     atualizarPreview();
   } catch (erro) {
     mostrarErro(erro.message);
+  } finally {
+    // Sem isto, escolher o mesmo arquivo de novo não dispara `change` e a
+    // interface parece não reagir.
+    el.arquivoLogo.value = "";
   }
 }
 
@@ -394,6 +395,7 @@ el.form.addEventListener("change", aoMudar);
 el.btnBaixar.addEventListener("click", baixar);
 el.btnSortear.addEventListener("click", atualizarPreview);
 el.btnTema.addEventListener("click", alternarTema);
+el.btnLogo.addEventListener("click", () => el.arquivoLogo.click());
 el.arquivoLogo.addEventListener("change", aoEscolherLogo);
 
 aplicarTema(temaInicial());
