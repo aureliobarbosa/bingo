@@ -42,9 +42,13 @@ const el = {
   previewVazio: document.getElementById("preview-vazio"),
   btnBaixar: document.getElementById("btn-baixar"),
   btnSortear: document.getElementById("btn-sortear"),
+  btnTema: document.getElementById("btn-tema"),
+  iconeSol: document.getElementById("icone-sol"),
+  iconeLua: document.getElementById("icone-lua"),
 };
 
 const CHAVE_ARMAZENAMENTO = "bingo.configuracao";
+const CHAVE_TEMA = "bingo.tema";
 let urlAtual = null;
 
 /* ------------------------------------------------------------ configuração */
@@ -107,7 +111,8 @@ function validar(cfg) {
     return "A lista de palavras não pode conter repetições.";
   }
   if (disponiveis(cfg) <= elementosPorFolha(cfg)) {
-    return `O número de elementos (${disponiveis(cfg)}) deve ser maior que os elementos por folha (${elementosPorFolha(cfg)}).`;
+    const limite = disponiveis(cfg) - 1 + (cfg.centro_livre ? 1 : 0);
+    return `O número de elementos (${disponiveis(cfg)}) deve ser maior que os elementos por folha (${elementosPorFolha(cfg)}). Com ${disponiveis(cfg)} elementos a grade pode ter no máximo ${limite} ${limite === 1 ? "célula" : "células"}.`;
   }
   return null;
 }
@@ -162,19 +167,24 @@ function exibirPdf(blob) {
   urlAtual = nova;
 }
 
-async function atualizarPreview() {
+/* Responde na hora a qualquer mudança do formulário: troca os campos
+ * visíveis, ajusta o centro livre, atualiza o resumo e valida. Só a geração
+ * do PDF é adiada — se isto ficasse junto do preview, o campo de palavras
+ * levaria o tempo do debounce para aparecer. */
+function sincronizarInterface() {
   ajustarCentroLivre();
   alternarTipo();
   const cfg = lerFormulario();
   atualizarResumo(cfg);
   salvar(cfg);
-
   const problema = validar(cfg);
-  if (problema) {
-    mostrarErro(problema);
-    return;
-  }
-  mostrarErro(null);
+  mostrarErro(problema);
+  return { cfg, problema };
+}
+
+async function atualizarPreview() {
+  const { cfg, problema } = sincronizarInterface();
+  if (problema) return;
 
   ocupado(true);
   try {
@@ -233,13 +243,58 @@ function restaurar() {
   el.titulo.value = cfg.titulo ?? el.titulo.value;
   el.subtitulo.value = cfg.subtitulo ?? "";
   el.numeroElementos.value = cfg.numero_elementos ?? el.numeroElementos.value;
-  el.palavras.value = (cfg.palavras || []).join("\n");
+  // Mantém a lista de exemplo do HTML quando nada de útil foi salvo.
+  if (cfg.palavras && cfg.palavras.length > 0) {
+    el.palavras.value = cfg.palavras.join("\n");
+  }
   el.linhas.value = cfg.linhas ?? el.linhas.value;
   el.colunas.value = cfg.colunas ?? el.colunas.value;
   el.numeroFolhas.value = cfg.numero_folhas ?? el.numeroFolhas.value;
   el.centroLivre.checked = Boolean(cfg.centro_livre);
   const radio = document.getElementById(`tipo-${cfg.tipo}`);
   if (radio) radio.checked = true;
+}
+
+/* --------------------------------------------------------------------- tema */
+
+function temaSalvo() {
+  try {
+    return localStorage.getItem(CHAVE_TEMA);
+  } catch (erro) {
+    return null;
+  }
+}
+
+/* Sem escolha salva, segue a preferência do sistema operacional. */
+function temaInicial() {
+  return (
+    temaSalvo() ||
+    (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+  );
+}
+
+function aplicarTema(tema) {
+  document.documentElement.setAttribute("data-bs-theme", tema);
+  const noturno = tema === "dark";
+  // O botão mostra o ícone do modo para o qual ele leva. Os ícones são SVG, e
+  // SVGElement não tem a propriedade `hidden` do HTMLElement — daí o atributo.
+  el.iconeSol.toggleAttribute("hidden", !noturno);
+  el.iconeLua.toggleAttribute("hidden", noturno);
+  el.btnTema.setAttribute(
+    "aria-label",
+    noturno ? "Mudar para modo diurno" : "Mudar para modo noturno"
+  );
+  el.btnTema.title = noturno ? "Modo diurno" : "Modo noturno";
+  try {
+    localStorage.setItem(CHAVE_TEMA, tema);
+  } catch (erro) {
+    /* Navegador sem armazenamento disponível: seguir sem lembrar. */
+  }
+}
+
+function alternarTema() {
+  const atual = document.documentElement.getAttribute("data-bs-theme");
+  aplicarTema(atual === "dark" ? "light" : "dark");
 }
 
 /* -------------------------------------------------------------- inicialização */
@@ -254,10 +309,17 @@ function comAtraso(funcao, espera) {
 
 const atualizarComAtraso = comAtraso(atualizarPreview, 400);
 
-el.form.addEventListener("input", atualizarComAtraso);
-el.form.addEventListener("change", atualizarComAtraso);
+function aoMudar() {
+  sincronizarInterface();
+  atualizarComAtraso();
+}
+
+el.form.addEventListener("input", aoMudar);
+el.form.addEventListener("change", aoMudar);
 el.btnBaixar.addEventListener("click", baixar);
 el.btnSortear.addEventListener("click", atualizarPreview);
+el.btnTema.addEventListener("click", alternarTema);
 
+aplicarTema(temaInicial());
 restaurar();
 atualizarPreview();

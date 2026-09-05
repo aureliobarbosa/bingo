@@ -14,7 +14,20 @@
     <!-- Painel de parâmetros -->
     <aside class="col-lg-4 col-xl-3 painel border-end bg-body">
       <div class="p-4">
-        <h1 class="h4 mb-1">Gerador de Bingo</h1>
+        <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+          <h1 class="h4 mb-0">Gerador de Bingo</h1>
+          <button type="button" class="btn btn-sm btn-outline-secondary border-0"
+                  id="btn-tema" aria-label="Alternar modo noturno">
+            <svg id="icone-lua" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"
+                 aria-hidden="true">
+              <path d="M6 .3a7 7 0 1 0 9.7 9.7A7.5 7.5 0 0 1 6 .3z"/>
+            </svg>
+            <svg id="icone-sol" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"
+                 aria-hidden="true" hidden>
+              <path d="M8 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0 1.5a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zM8 0a.7.7 0 0 1 .7.7v1.4a.7.7 0 0 1-1.4 0V.7A.7.7 0 0 1 8 0zm0 13.2a.7.7 0 0 1 .7.7v1.4a.7.7 0 0 1-1.4 0v-1.4a.7.7 0 0 1 .7-.7zM16 8a.7.7 0 0 1-.7.7h-1.4a.7.7 0 0 1 0-1.4h1.4A.7.7 0 0 1 16 8zM2.8 8a.7.7 0 0 1-.7.7H.7a.7.7 0 0 1 0-1.4h1.4a.7.7 0 0 1 .7.7zm10.9-5.7a.7.7 0 0 1 0 1l-1 1a.7.7 0 1 1-1-1l1-1a.7.7 0 0 1 1 0zM4.3 11.7a.7.7 0 0 1 0 1l-1 1a.7.7 0 0 1-1-1l1-1a.7.7 0 0 1 1 0zm9.4 2a.7.7 0 0 1-1 0l-1-1a.7.7 0 0 1 1-1l1 1a.7.7 0 0 1 0 1zM4.3 4.3a.7.7 0 0 1-1 0l-1-1a.7.7 0 0 1 1-1l1 1a.7.7 0 0 1 0 1z"/>
+            </svg>
+          </button>
+        </div>
         <p class="text-body-secondary small mb-4">
           Monte as cartelas e baixe um PDF pronto para imprimir.
         </p>
@@ -57,9 +70,16 @@
 
             <div id="campo-palavras" hidden>
               <label for="palavras" class="form-label small">Palavras, uma por linha</label>
-              <textarea class="form-control font-monospace" id="palavras" name="palavras"
-                        rows="8" spellcheck="false"
-                        placeholder="abacaxi&#10;banana&#10;caqui"></textarea>
+              <textarea class="form-control" id="palavras" name="palavras"
+                        rows="9" spellcheck="false">Legião Urbana
+Titãs
+Os Paralamas do Sucesso
+Barão Vermelho
+The Beatles
+Led Zeppelin
+Pink Floyd
+Queen
+Nirvana</textarea>
               <div class="form-text"><span id="contagem-palavras">0</span> palavras</div>
             </div>
           </fieldset>
