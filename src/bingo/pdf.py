@@ -1,10 +1,13 @@
 """Desenho das folhas de bingo em PDF (A4 retrato, uma folha por página)."""
 
 import io
+from functools import lru_cache
 from pathlib import Path
 
+from PIL import Image
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from bingo.gerador import Folha
@@ -23,6 +26,7 @@ CINZA_CENTRO = 0.92
 RAIZ_PROJETO = Path(__file__).resolve().parents[2]
 LOGO_PADRAO = RAIZ_PROJETO / "static" / "images" / "logo.jpeg"
 PROPORCAO_LOGO = 0.88  # fração do lado da célula ocupada pelo logo
+LIMIAR_BRANCO = 250  # acima disto o pixel conta como margem, não como desenho
 PROPORCAO_FONTE = 0.45  # tamanho inicial da fonte da célula, relativo ao lado
 MARGEM_TEXTO = 0.85  # fração do lado que o texto pode ocupar
 ENTRELINHA = 1.15  # espaçamento entre as linhas de uma mesma célula
@@ -67,6 +71,30 @@ def _tamanho_fonte_celula(
     return tamanho
 
 
+def caixa_do_conteudo(imagem: Image.Image) -> tuple[int, int, int, int] | None:
+    """Retângulo que envolve o desenho, descartando a margem clara em volta.
+
+    Devolve None quando a imagem é inteiramente clara — aí não há o que recortar.
+    """
+    mascara = imagem.convert("L").point(lambda v: 255 if v < LIMIAR_BRANCO else 0)
+    return mascara.getbbox()
+
+
+@lru_cache(maxsize=8)
+def _logo_recortado(caminho: str, versao: float) -> ImageReader:
+    """Logo sem a margem em volta, pronto para o reportlab.
+
+    O resultado fica em cache: um jogo de 500 folhas abre o arquivo uma vez só.
+    `versao` é o mtime do arquivo e serve para invalidar o cache se ele mudar.
+    """
+    with Image.open(caminho) as arquivo:
+        imagem = arquivo.convert("RGB")
+    caixa = caixa_do_conteudo(imagem)
+    if caixa:
+        imagem = imagem.crop(caixa)
+    return ImageReader(imagem)
+
+
 def _desenhar_logo(c: canvas.Canvas, x: float, y: float, lado: float) -> bool:
     """Desenha o logo na célula central. Devolve False se não houver arquivo."""
     if not LOGO_PADRAO.is_file():
@@ -74,7 +102,7 @@ def _desenhar_logo(c: canvas.Canvas, x: float, y: float, lado: float) -> bool:
     tamanho = lado * PROPORCAO_LOGO
     borda = (lado - tamanho) / 2
     c.drawImage(
-        str(LOGO_PADRAO),
+        _logo_recortado(str(LOGO_PADRAO), LOGO_PADRAO.stat().st_mtime),
         x + borda,
         y + borda,
         width=tamanho,

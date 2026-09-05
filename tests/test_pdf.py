@@ -100,3 +100,47 @@ def test_sem_centro_livre_nao_ha_imagem():
     cfg = ConfiguracaoJogo(linhas=4, colunas=4, centro_livre=False)
     pagina = _paginas(gerar_pdf_folha(gerar_folha(cfg), cfg))[0]
     assert len(pagina.images) == 0
+
+
+def test_caixa_do_conteudo_ignora_a_margem_clara():
+    from PIL import Image
+
+    from bingo.pdf import caixa_do_conteudo
+
+    imagem = Image.new("RGB", (100, 100), "white")
+    for x in range(20, 60):
+        for y in range(30, 70):
+            imagem.putpixel((x, y), (0, 120, 130))
+    assert caixa_do_conteudo(imagem) == (20, 30, 60, 70)
+
+
+def test_imagem_toda_clara_nao_tem_o_que_recortar():
+    from PIL import Image
+
+    from bingo.pdf import caixa_do_conteudo
+
+    assert caixa_do_conteudo(Image.new("RGB", (50, 50), "white")) is None
+
+
+def test_logo_do_projeto_perde_a_margem_no_recorte():
+    from PIL import Image
+
+    from bingo.pdf import LOGO_PADRAO, caixa_do_conteudo
+
+    with Image.open(LOGO_PADRAO) as arquivo:
+        imagem = arquivo.convert("RGB")
+    caixa = caixa_do_conteudo(imagem)
+    assert caixa is not None
+    largura = caixa[2] - caixa[0]
+    altura = caixa[3] - caixa[1]
+    assert largura < imagem.width and altura < imagem.height
+
+
+def test_logo_recortado_fica_em_cache():
+    """Um jogo de muitas folhas não pode reabrir o arquivo a cada página."""
+    from bingo.pdf import LOGO_PADRAO, _logo_recortado
+
+    versao = LOGO_PADRAO.stat().st_mtime
+    assert _logo_recortado(str(LOGO_PADRAO), versao) is _logo_recortado(
+        str(LOGO_PADRAO), versao
+    )
