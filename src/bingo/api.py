@@ -4,8 +4,6 @@ O serviço é stateless: cada requisição traz a configuração completa do jog
 e recebe de volta um PDF.
 """
 
-from pathlib import Path
-
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -13,9 +11,9 @@ from pydantic import BaseModel, Field
 
 from bingo.gerador import gerar_folha, gerar_jogo
 from bingo.models import MAX_FOLHAS, ConfiguracaoJogo, TipoBingo
-from bingo.pdf import gerar_pdf_folha, gerar_pdf_jogo
+from bingo.pdf import RAIZ_PROJETO, gerar_pdf_folha, gerar_pdf_jogo
 
-STATIC = Path(__file__).resolve().parents[2] / "static"
+STATIC = RAIZ_PROJETO / "static"
 
 app = FastAPI(title="Bingo", description="Gerador de cartelas de bingo para impressão")
 

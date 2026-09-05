@@ -1,6 +1,7 @@
 """Desenho das folhas de bingo em PDF (A4 retrato, uma folha por página)."""
 
 import io
+from pathlib import Path
 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
@@ -18,6 +19,10 @@ FONTE_TEXTO = "Helvetica"
 FONTE_CELULA = "Helvetica-Bold"
 
 CINZA_CENTRO = 0.92
+
+RAIZ_PROJETO = Path(__file__).resolve().parents[2]
+LOGO_PADRAO = RAIZ_PROJETO / "static" / "images" / "logo.jpeg"
+PROPORCAO_LOGO = 0.88  # fração do lado da célula ocupada pelo logo
 PROPORCAO_FONTE = 0.45  # tamanho inicial da fonte da célula, relativo ao lado
 MARGEM_TEXTO = 0.85  # fração do lado que o texto pode ocupar
 ENTRELINHA = 1.15  # espaçamento entre as linhas de uma mesma célula
@@ -60,6 +65,25 @@ def _tamanho_fonte_celula(
     mais_linhas = max(len(celula) for celula in linhas_das_celulas)
     tamanho = min(tamanho, lado * MARGEM_TEXTO / (mais_linhas * ENTRELINHA))
     return tamanho
+
+
+def _desenhar_logo(c: canvas.Canvas, x: float, y: float, lado: float) -> bool:
+    """Desenha o logo na célula central. Devolve False se não houver arquivo."""
+    if not LOGO_PADRAO.is_file():
+        return False
+    tamanho = lado * PROPORCAO_LOGO
+    borda = (lado - tamanho) / 2
+    c.drawImage(
+        str(LOGO_PADRAO),
+        x + borda,
+        y + borda,
+        width=tamanho,
+        height=tamanho,
+        preserveAspectRatio=True,
+        anchor="c",
+        mask="auto",
+    )
+    return True
 
 
 def _desenhar_cabecalho(c: canvas.Canvas, cfg: ConfiguracaoJogo, topo: float) -> None:
@@ -113,9 +137,11 @@ def desenhar_folha(
         y = y0 + (cfg.linhas - 1 - linha) * lado
 
         if texto is None:
-            c.setFillGray(CINZA_CENTRO)
-            c.rect(x, y, lado, lado, stroke=0, fill=1)
-            c.setFillGray(0)
+            # A célula central recebe o logo; sem arquivo de logo, fica cinza.
+            if not _desenhar_logo(c, x, y, lado):
+                c.setFillGray(CINZA_CENTRO)
+                c.rect(x, y, lado, lado, stroke=0, fill=1)
+                c.setFillGray(0)
 
         c.setLineWidth(0.8)
         c.rect(x, y, lado, lado, stroke=1, fill=0)

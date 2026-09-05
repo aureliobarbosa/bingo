@@ -87,3 +87,16 @@ def test_quebrar_em_duas_linhas_aumenta_a_fonte():
     quebrado = _tamanho_fonte_celula(c, _linhas_das_celulas(nomes), lado)
     inteiro = _tamanho_fonte_celula(c, tuple((n,) for n in nomes), lado)
     assert quebrado > inteiro
+
+
+def test_logo_e_desenhado_na_celula_central():
+    """Com centro livre, a página carrega exatamente uma imagem: o logo."""
+    cfg = ConfiguracaoJogo(linhas=5, colunas=5, centro_livre=True)
+    pagina = _paginas(gerar_pdf_folha(gerar_folha(cfg), cfg))[0]
+    assert len(pagina.images) == 1
+
+
+def test_sem_centro_livre_nao_ha_imagem():
+    cfg = ConfiguracaoJogo(linhas=4, colunas=4, centro_livre=False)
+    pagina = _paginas(gerar_pdf_folha(gerar_folha(cfg), cfg))[0]
+    assert len(pagina.images) == 0
