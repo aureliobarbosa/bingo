@@ -96,12 +96,6 @@ def test_logo_e_desenhado_na_celula_central():
     assert len(pagina.images) == 1
 
 
-def test_logo_nenhum_deixa_a_celula_central_vazia():
-    cfg = ConfiguracaoJogo(linhas=5, colunas=5, centro_livre=True, logo="nenhum")
-    pagina = _paginas(gerar_pdf_folha(gerar_folha(cfg), cfg))[0]
-    assert len(pagina.images) == 0
-
-
 def test_sem_centro_livre_nao_ha_imagem():
     cfg = ConfiguracaoJogo(linhas=4, colunas=4, centro_livre=False)
     pagina = _paginas(gerar_pdf_folha(gerar_folha(cfg), cfg))[0]

@@ -53,7 +53,6 @@ const el = {
   linhas: document.getElementById("linhas"),
   colunas: document.getElementById("colunas"),
   centroLivre: document.getElementById("centro_livre"),
-  logo: document.getElementById("logo"),
   numeroFolhas: document.getElementById("numero_folhas"),
   campoNumeros: document.getElementById("campo-numeros"),
   campoPalavras: document.getElementById("campo-palavras"),
@@ -101,7 +100,6 @@ function lerFormulario() {
     colunas: inteiro(el.colunas),
     numero_folhas: inteiro(el.numeroFolhas),
     centro_livre: el.centroLivre.checked && !el.centroLivre.disabled,
-    logo: el.logo.value,
     titulo: el.titulo.value,
     subtitulo: el.subtitulo.value,
   };
@@ -173,8 +171,6 @@ function ajustarCentroLivre() {
   const impares = inteiro(el.linhas) % 2 === 1 && inteiro(el.colunas) % 2 === 1;
   el.centroLivre.disabled = !impares;
   if (!impares) el.centroLivre.checked = false;
-  // Sem célula central não há onde pôr o logo.
-  el.logo.disabled = !el.centroLivre.checked;
 }
 
 function alternarTipo() {
@@ -287,7 +283,6 @@ function restaurar() {
   el.colunas.value = cfg.colunas ?? el.colunas.value;
   el.numeroFolhas.value = cfg.numero_folhas ?? el.numeroFolhas.value;
   el.centroLivre.checked = Boolean(cfg.centro_livre);
-  if (cfg.logo) el.logo.value = cfg.logo;
   const radio = document.getElementById(`tipo-${cfg.tipo}`);
   if (radio) radio.checked = true;
 }

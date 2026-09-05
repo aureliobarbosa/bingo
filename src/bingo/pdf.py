@@ -95,15 +95,9 @@ def _logo_recortado(caminho: str, versao: float) -> ImageReader:
     return ImageReader(imagem)
 
 
-def _desenhar_logo(
-    c: canvas.Canvas, cfg: ConfiguracaoJogo, x: float, y: float, lado: float
-) -> bool:
-    """Desenha o logo na célula central.
-
-    Devolve False quando não há logo a desenhar — por escolha do usuário ou por
-    falta do arquivo —, e nesse caso a célula fica cinza.
-    """
-    if cfg.logo == "nenhum" or not LOGO_PADRAO.is_file():
+def _desenhar_logo(c: canvas.Canvas, x: float, y: float, lado: float) -> bool:
+    """Desenha o logo na célula central. Devolve False se não houver arquivo."""
+    if not LOGO_PADRAO.is_file():
         return False
     tamanho = lado * PROPORCAO_LOGO
     borda = (lado - tamanho) / 2
@@ -172,7 +166,7 @@ def desenhar_folha(
 
         if texto is None:
             # A célula central recebe o logo; sem arquivo de logo, fica cinza.
-            if not _desenhar_logo(c, cfg, x, y, lado):
+            if not _desenhar_logo(c, x, y, lado):
                 c.setFillGray(CINZA_CENTRO)
                 c.rect(x, y, lado, lado, stroke=0, fill=1)
                 c.setFillGray(0)

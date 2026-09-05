@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from bingo.gerador import gerar_folha, gerar_jogo
-from bingo.models import MAX_FOLHAS, ConfiguracaoJogo, OpcaoLogo, TipoBingo
+from bingo.models import MAX_FOLHAS, ConfiguracaoJogo, TipoBingo
 from bingo.pdf import RAIZ_PROJETO, gerar_pdf_folha, gerar_pdf_jogo
 
 STATIC = RAIZ_PROJETO / "static"
@@ -28,7 +28,6 @@ class ConfiguracaoIn(BaseModel):
     colunas: int = Field(default=5, ge=1, le=20)
     numero_folhas: int = Field(default=10, ge=1, le=MAX_FOLHAS)
     centro_livre: bool = True
-    logo: OpcaoLogo = "padrao"
     titulo: str = Field(default="BINGO", max_length=80)
     subtitulo: str = Field(default="", max_length=120)
 
@@ -42,7 +41,6 @@ class ConfiguracaoIn(BaseModel):
             colunas=self.colunas,
             numero_folhas=self.numero_folhas,
             centro_livre=self.centro_livre,
-            logo=self.logo,
             titulo=self.titulo.strip(),
             subtitulo=self.subtitulo.strip(),
         )

@@ -68,9 +68,3 @@ def test_campo_fora_do_intervalo_e_rejeitado_pelo_schema():
 
 def test_index_e_servido():
     assert client.get("/").status_code == 200
-
-
-def test_api_aceita_a_escolha_de_logo():
-    r = client.post("/api/preview", json={**CONFIG, "logo": "nenhum"})
-    assert r.status_code == 200
-    assert len(PdfReader(io.BytesIO(r.content)).pages[0].images) == 0
