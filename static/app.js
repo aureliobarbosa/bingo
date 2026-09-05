@@ -75,6 +75,8 @@ const el = {
 const CHAVE_ARMAZENAMENTO = "bingo.configuracao";
 const CHAVE_TEMA = "bingo.tema";
 const LOGO_PADRAO = "logo.jpeg";
+const FORMATOS_LOGO = ["image/png", "image/jpeg"];
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 
 /* Imagem enviada pelo usuário. Fica só em memória: um data URI de alguns MB
  * estouraria a cota do localStorage e derrubaria o resto da configuração. */
@@ -312,11 +314,31 @@ function lerComoDataUri(arquivo) {
   });
 }
 
+/* As mesmas regras do backend, para avisar sem gastar uma viagem ao servidor. */
+function problemaNoLogo(arquivo) {
+  if (!FORMATOS_LOGO.includes(arquivo.type)) {
+    return `O logo precisa ser PNG ou JPEG (recebido: ${arquivo.type || "desconhecido"}).`;
+  }
+  if (arquivo.size > MAX_LOGO_BYTES) {
+    const megabytes = (arquivo.size / (1024 * 1024)).toFixed(1);
+    return `O logo tem ${megabytes} MB e o limite é ${MAX_LOGO_BYTES / (1024 * 1024)} MB.`;
+  }
+  return null;
+}
+
 async function aoEscolherLogo(evento) {
   // O change do input também borbulha até o form; tratar aqui é suficiente.
   evento.stopPropagation();
   const arquivo = el.arquivoLogo.files[0];
   if (!arquivo) return;
+
+  const problema = problemaNoLogo(arquivo);
+  if (problema) {
+    mostrarErro(problema);
+    el.arquivoLogo.value = "";
+    return;
+  }
+
   try {
     const dados = await lerComoDataUri(arquivo);
     logoEnviado = { nome: arquivo.name, dados };

@@ -28,6 +28,7 @@ RAIZ_PROJETO = Path(__file__).resolve().parents[2]
 LOGO_PADRAO = RAIZ_PROJETO / "static" / "images" / "logo.jpeg"
 PROPORCAO_LOGO = 0.88  # fração do lado da célula ocupada pelo logo
 LIMIAR_BRANCO = 250  # acima disto o pixel conta como margem, não como desenho
+MAX_PIXELS_LOGO = 25_000_000  # trava contra imagem pequena que descomprime enorme
 PROPORCAO_FONTE = 0.45  # tamanho inicial da fonte da célula, relativo ao lado
 MARGEM_TEXTO = 0.85  # fração do lado que o texto pode ocupar
 ENTRELINHA = 1.15  # espaçamento entre as linhas de uma mesma célula
@@ -105,10 +106,18 @@ def _logo_enviado(data_uri: str) -> ImageReader:
     """Logo que veio na requisição, como data URI (`data:image/png;base64,...`)."""
     _, _, dados = data_uri.partition(",")
     try:
-        with Image.open(io.BytesIO(base64.b64decode(dados, validate=True))) as arquivo:
-            return _sem_margem(arquivo.convert("RGB"))
+        arquivo = Image.open(io.BytesIO(base64.b64decode(dados, validate=True)))
     except Exception as erro:
         raise ValueError("Não foi possível ler a imagem enviada como logo.") from erro
+
+    with arquivo:
+        largura, altura = arquivo.size
+        if largura * altura > MAX_PIXELS_LOGO:
+            raise ValueError(
+                f"O logo tem {largura}x{altura} pixels, acima do limite de "
+                f"{MAX_PIXELS_LOGO // 1_000_000} megapixels."
+            )
+        return _sem_margem(arquivo.convert("RGB"))
 
 
 def _logo_para_desenho(cfg: ConfiguracaoJogo) -> ImageReader | None:

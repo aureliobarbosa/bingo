@@ -179,3 +179,23 @@ def test_logo_enviado_ilegivel_vira_erro_em_portugues():
     )
     with pytest.raises(ValueError, match="ler a imagem enviada"):
         gerar_pdf_folha(gerar_folha(cfg), cfg)
+
+
+def test_logo_com_pixels_demais_e_rejeitado():
+    """Imagem pequena em bytes pode descomprimir para muitos megapixels."""
+    import base64
+    import io as _io
+
+    import pytest
+    from PIL import Image
+
+    from bingo.pdf import MAX_PIXELS_LOGO
+
+    lado = int(MAX_PIXELS_LOGO**0.5) + 500
+    buffer = _io.BytesIO()
+    Image.new("RGB", (lado, lado), "white").save(buffer, format="PNG")
+    uri = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+    cfg = ConfiguracaoJogo(linhas=5, colunas=5, centro_livre=True, logo_enviado=uri)
+    with pytest.raises(ValueError, match="megapixels"):
+        gerar_pdf_folha(gerar_folha(cfg), cfg)

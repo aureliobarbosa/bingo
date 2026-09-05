@@ -68,3 +68,11 @@ def test_campo_fora_do_intervalo_e_rejeitado_pelo_schema():
 
 def test_index_e_servido():
     assert client.get("/").status_code == 200
+
+
+def test_logo_invalido_vira_422_em_portugues():
+    r = client.post(
+        "/api/preview", json={**CONFIG, "logo_enviado": "data:image/gif;base64,R0lGOD"}
+    )
+    assert r.status_code == 422
+    assert "PNG ou JPEG" in r.json()["detail"]

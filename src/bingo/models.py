@@ -8,6 +8,9 @@ TipoBingo = Literal["numeros", "palavras"]
 MAX_CELULAS = 100
 MAX_FOLHAS = 500
 
+FORMATOS_LOGO = ("image/png", "image/jpeg")
+MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB: o data URI trafega a cada preview
+
 
 @dataclass(frozen=True)
 class ConfiguracaoJogo:
@@ -65,8 +68,8 @@ class ConfiguracaoJogo:
         if self.tipo not in ("numeros", "palavras"):
             raise ValueError("Tipo de bingo deve ser 'numeros' ou 'palavras'.")
 
-        if self.logo_enviado and not self.logo_enviado.startswith("data:image/"):
-            raise ValueError("O logo enviado precisa ser uma imagem.")
+        if self.logo_enviado:
+            self._validar_logo()
 
         if self.linhas < 1 or self.colunas < 1:
             raise ValueError("A grade precisa ter ao menos uma linha e uma coluna.")
@@ -99,4 +102,29 @@ class ConfiguracaoJogo:
             raise ValueError(
                 f"O número de elementos ({disponiveis}) deve ser maior que os "
                 f"elementos por folha ({self.elementos_por_folha})."
+            )
+
+    def _validar_logo(self) -> None:
+        """Checa o logo enviado sem decodificar a imagem.
+
+        O formato vem do cabeçalho do data URI e o tamanho é calculado do
+        comprimento do base64 — abrir a imagem é trabalho do módulo de PDF.
+        """
+        cabecalho, separador, dados = self.logo_enviado.partition(",")
+        if not separador or not cabecalho.startswith("data:"):
+            raise ValueError("O logo enviado não está num formato reconhecido.")
+
+        formato = cabecalho.removeprefix("data:").split(";")[0]
+        if formato not in FORMATOS_LOGO:
+            raise ValueError(
+                f"O logo precisa ser PNG ou JPEG (recebido: {formato or 'desconhecido'})."
+            )
+
+        # base64 usa 4 caracteres para cada 3 bytes; o '=' final é enchimento.
+        bytes_imagem = len(dados) * 3 // 4 - dados.count("=")
+        if bytes_imagem > MAX_LOGO_BYTES:
+            limite = MAX_LOGO_BYTES // (1024 * 1024)
+            raise ValueError(
+                f"O logo tem {bytes_imagem / (1024 * 1024):.1f} MB e o limite é "
+                f"{limite} MB."
             )

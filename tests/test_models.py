@@ -76,6 +76,35 @@ def test_tipo_invalido():
         ConfiguracaoJogo(tipo="letras")
 
 
-def test_logo_enviado_precisa_ser_imagem():
-    with pytest.raises(ValueError, match="precisa ser uma imagem"):
+def _uri_de_logo(formato: str = "image/png", bytes_extra: int = 0) -> str:
+    import base64
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (80, 80), "white").save(buffer, format="PNG")
+    dados = buffer.getvalue() + b"\0" * bytes_extra
+    return f"data:{formato};base64," + base64.b64encode(dados).decode()
+
+
+def test_logo_em_png_ou_jpeg_e_aceito():
+    ConfiguracaoJogo(logo_enviado=_uri_de_logo("image/png"))
+    ConfiguracaoJogo(logo_enviado=_uri_de_logo("image/jpeg"))
+
+
+def test_logo_em_outro_formato_e_rejeitado():
+    with pytest.raises(ValueError, match="PNG ou JPEG"):
+        ConfiguracaoJogo(logo_enviado=_uri_de_logo("image/gif"))
+    with pytest.raises(ValueError, match="PNG ou JPEG"):
         ConfiguracaoJogo(logo_enviado="data:text/plain;base64,bXVpdG8=")
+
+
+def test_logo_acima_do_limite_de_tamanho():
+    with pytest.raises(ValueError, match="o limite é 2 MB"):
+        ConfiguracaoJogo(logo_enviado=_uri_de_logo(bytes_extra=3 * 1024 * 1024))
+
+
+def test_data_uri_malformado():
+    with pytest.raises(ValueError, match="formato reconhecido"):
+        ConfiguracaoJogo(logo_enviado="data:image/png;base64")
