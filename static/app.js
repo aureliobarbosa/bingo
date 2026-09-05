@@ -57,6 +57,7 @@ const el = {
   arquivoLogo: document.getElementById("arquivo_logo"),
   rotuloLogo: document.getElementById("rotulo-logo"),
   numeroFolhas: document.getElementById("numero_folhas"),
+  rotuloFolhas: document.getElementById("rotulo-folhas"),
   campoNumeros: document.getElementById("campo-numeros"),
   campoPalavras: document.getElementById("campo-palavras"),
   contagemPalavras: document.getElementById("contagem-palavras"),
@@ -129,6 +130,24 @@ function disponiveis(cfg) {
   return cfg.tipo === "numeros" ? cfg.numero_elementos : cfg.palavras.length;
 }
 
+/* Quantas folhas distintas o universo permite: C(n, k), com as folhas tratadas
+ * como conjuntos. O produto é interrompido ao passar de MAX_FOLHAS — é o único
+ * limite que interessa mostrar, e assim não é preciso BigInt para C(75, 24). */
+function combinacoesPossiveis(n, k) {
+  if (n <= k) return 0;
+  let total = 1;
+  const passos = Math.min(k, n - k);
+  for (let i = 1; i <= passos; i += 1) {
+    total = (total * (n - passos + i)) / i;
+    if (total > MAX_FOLHAS) return MAX_FOLHAS;
+  }
+  return Math.round(total);
+}
+
+function maximoDeFolhas(cfg) {
+  return Math.min(MAX_FOLHAS, combinacoesPossiveis(disponiveis(cfg), elementosPorFolha(cfg)));
+}
+
 /* As mesmas regras do backend, para dar resposta imediata sem ida ao servidor.
  * O backend continua sendo a autoridade: erros dele também são exibidos. */
 function validar(cfg) {
@@ -148,6 +167,10 @@ function validar(cfg) {
     const limite = disponiveis(cfg) - 1 + (cfg.centro_livre ? 1 : 0);
     return `O número de elementos (${disponiveis(cfg)}) deve ser maior que os elementos por folha (${elementosPorFolha(cfg)}). Com ${disponiveis(cfg)} elementos a grade pode ter no máximo ${limite} ${limite === 1 ? "célula" : "células"}.`;
   }
+  const maximo = maximoDeFolhas(cfg);
+  if (cfg.numero_folhas > maximo) {
+    return `Com ${disponiveis(cfg)} elementos e ${elementosPorFolha(cfg)} por folha existem apenas ${maximo} folhas distintas possíveis.`;
+  }
   return null;
 }
 
@@ -163,6 +186,13 @@ function mostrarErro(mensagem) {
 
 function ocupado(estaOcupado) {
   el.estado.hidden = !estaOcupado;
+}
+
+function atualizarMaximoDeFolhas(cfg) {
+  const maximo = maximoDeFolhas(cfg);
+  el.rotuloFolhas.textContent =
+    maximo > 0 ? `Número de folhas (de 1 a ${maximo})` : "Número de folhas";
+  el.numeroFolhas.max = String(Math.max(maximo, 1));
 }
 
 function atualizarResumo(cfg) {
@@ -209,6 +239,7 @@ function sincronizarInterface() {
   ajustarCentroLivre();
   alternarTipo();
   const cfg = lerFormulario();
+  atualizarMaximoDeFolhas(cfg);
   atualizarResumo(cfg);
   salvar(cfg);
   const problema = validar(cfg);

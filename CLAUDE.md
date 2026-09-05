@@ -12,7 +12,7 @@ O plano completo, com as etapas já feitas e as pendentes, está em
 
 ```bash
 uv sync                                    # cria o ambiente (baixa o Python 3.14)
-uv run pytest -q                           # 32 testes
+uv run pytest -q                           # 49 testes
 uv run uvicorn bingo.api:app --reload      # http://127.0.0.1:8000
 ```
 
