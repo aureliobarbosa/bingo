@@ -77,6 +77,7 @@ const CHAVE_TEMA = "bingo.tema";
 const LOGO_PADRAO = "logo.jpeg";
 const FORMATOS_LOGO = ["image/png", "image/jpeg"];
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const MAX_FOLHAS = 100; // precisa acompanhar MAX_FOLHAS em src/bingo/models.py
 
 /* Imagem enviada pelo usuário. Fica só em memória: um data URI de alguns MB
  * estouraria a cota do localStorage e derrubaria o resto da configuração. */
@@ -137,8 +138,8 @@ function validar(cfg) {
   if (celulas(cfg) > 100) {
     return `A grade não pode passar de 100 células (pedido: ${cfg.linhas}x${cfg.colunas} = ${celulas(cfg)}).`;
   }
-  if (cfg.numero_folhas < 1 || cfg.numero_folhas > 500) {
-    return "O número de folhas deve estar entre 1 e 500.";
+  if (cfg.numero_folhas < 1 || cfg.numero_folhas > MAX_FOLHAS) {
+    return `O número de folhas deve estar entre 1 e ${MAX_FOLHAS}.`;
   }
   if (cfg.tipo === "palavras" && new Set(cfg.palavras).size !== cfg.palavras.length) {
     return "A lista de palavras não pode conter repetições.";

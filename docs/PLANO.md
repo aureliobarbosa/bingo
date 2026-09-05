@@ -101,7 +101,8 @@ português para cada regra:
 - `linhas`, `colunas` ≥ 1; `linhas * colunas` ≤ 100 (sanidade de impressão)
 - `centro_livre` exige `linhas` e `colunas` ímpares
 - `len(universo) > elementos_por_folha` — regra explícita do usuário
-- `1 ≤ numero_folhas ≤ 500` — teto de proteção para o serviço online
+- `1 ≤ numero_folhas ≤ MAX_FOLHAS` — teto de proteção para o serviço online
+  (500 no plano original; hoje 100, decidido durante a execução)
 - tipo `palavras`: nenhuma palavra vazia depois de `strip()`; sem duplicatas
 - tipo `numeros`: `numero_elementos ≥ 1`
 
@@ -282,7 +283,7 @@ Arquivo: `static/app.js` e `static/index.html`.
 
 ### 6.1.5 Limitar o número de folhas às combinações possíveis (backend)
 
-Hoje o número de folhas é limitado apenas pelo teto `MAX_FOLHAS = 500`. Ele deve
+Hoje o número de folhas é limitado apenas pelo teto `MAX_FOLHAS`. Ele deve
 passar a ser limitado também pela quantidade de folhas distintas que o universo
 permite formar.
 
@@ -348,9 +349,9 @@ atingir esse valor, para de multiplicar e devolve 1000. Isso dispensa `BigInt` e
 resolve o estouro de `Number.MAX_SAFE_INTEGER` (C(75, 24) ≈ 2,6 × 10¹⁹). O contexto
 de uso justifica: a maior turma da escola tem 30 alunos e a escola inteira, 200.
 
-Conciliar com o backend na implementação: `MAX_FOLHAS` hoje é 500 em
-`src/bingo/models.py`, então o limite efetivo continua sendo 500 — decidir se o teto
-sobe para 1000 ou se o frontend satura em `MAX_FOLHAS`.
+**Resolvido:** `MAX_FOLHAS` passou a ser 100, no backend e no frontend, e é o teto
+único dos dois lados. Com isso o cálculo em JavaScript não precisa de `BigInt`:
+basta parar de multiplicar ao passar de `MAX_FOLHAS`.
 
 Arquivos: `static/index.html` e `static/app.js`.
 
@@ -411,7 +412,7 @@ Decisões de operação, todas ainda em aberto:
   facilidade e limites de CPU — a geração de PDF é trabalho de CPU, não de I/O.
 - **Segurança**, vinculada às escolhas acima:
   - TLS e redirecionamento de HTTP para HTTPS;
-  - limite de taxa por IP: gerar 500 folhas é caro, e a rota é aberta e sem
+  - limite de taxa por IP: gerar um jogo cheio é caro, e a rota é aberta e sem
     autenticação — é o vetor de abuso mais óbvio do serviço;
   - limite de tamanho do corpo da requisição (lista de palavras e, se a Etapa 6.1.3
     ficar pronta, a imagem enviada);

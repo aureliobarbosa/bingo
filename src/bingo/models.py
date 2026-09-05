@@ -7,7 +7,7 @@ from typing import Literal
 TipoBingo = Literal["numeros", "palavras"]
 
 MAX_CELULAS = 100
-MAX_FOLHAS = 500
+MAX_FOLHAS = 100
 
 FORMATOS_LOGO = ("image/png", "image/jpeg")
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB: o data URI trafega a cada preview
@@ -124,8 +124,8 @@ class ConfiguracaoJogo:
             )
 
         # Não adianta pedir mais folhas do que existem combinações distintas.
-        # Só morde em universos pequenos: acima de 500 combinações quem limita
-        # é MAX_FOLHAS, já validado acima.
+        # Só morde em universos pequenos: acima de MAX_FOLHAS combinações quem
+        # limita é o teto, já validado acima.
         combinacoes = self.combinacoes_possiveis
         if self.numero_folhas > combinacoes:
             raise ValueError(

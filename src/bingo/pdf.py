@@ -94,7 +94,7 @@ def _sem_margem(imagem: Image.Image) -> ImageReader:
 def _logo_do_arquivo(caminho: str, versao: float) -> ImageReader:
     """Logo padrão, lido do disco.
 
-    O resultado fica em cache: um jogo de 500 folhas abre o arquivo uma vez só.
+    O resultado fica em cache: um jogo inteiro abre o arquivo uma vez só.
     `versao` é o mtime do arquivo e serve para invalidar o cache se ele mudar.
     """
     with Image.open(caminho) as arquivo:

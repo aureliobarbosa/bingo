@@ -42,10 +42,10 @@ def test_centro_livre_exige_dimensoes_impares():
 
 
 def test_numero_de_folhas_fora_do_intervalo():
-    with pytest.raises(ValueError, match="entre 1 e 500"):
+    with pytest.raises(ValueError, match="entre 1 e 100"):
         ConfiguracaoJogo(numero_folhas=0)
-    with pytest.raises(ValueError, match="entre 1 e 500"):
-        ConfiguracaoJogo(numero_folhas=501)
+    with pytest.raises(ValueError, match="entre 1 e 100"):
+        ConfiguracaoJogo(numero_folhas=MAX_FOLHAS + 1)
 
 
 def test_elementos_devem_superar_os_elementos_por_folha():
@@ -142,7 +142,7 @@ def test_universo_grande_e_limitado_pelo_teto_do_servico():
     import math
 
     cfg = ConfiguracaoJogo(
-        numero_elementos=75, linhas=5, colunas=5, centro_livre=True, numero_folhas=500
+        numero_elementos=75, linhas=5, colunas=5, centro_livre=True, numero_folhas=MAX_FOLHAS
     )
     assert cfg.combinacoes_possiveis == math.comb(75, 24)
     assert cfg.maximo_folhas == MAX_FOLHAS
