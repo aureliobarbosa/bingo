@@ -7,7 +7,7 @@ from pypdf import PdfReader
 from bingo.gerador import gerar_folha, gerar_jogo
 from bingo.models import ConfiguracaoJogo
 
-from bingo.pdf import gerar_pdf_folha, gerar_pdf_jogo
+from bingo.pdf import dividir_texto, gerar_pdf_folha, gerar_pdf_jogo
 
 PALAVRAS = tuple(f"palavra{i}" for i in range(20))
 
@@ -47,3 +47,43 @@ def test_rodape_numera_as_folhas():
     paginas = _paginas(gerar_pdf_jogo(gerar_jogo(cfg), cfg))
     assert "Folha 1 de 3" in paginas[0].extract_text()
     assert "Folha 3 de 3" in paginas[2].extract_text()
+
+
+def test_divisao_ocorre_no_espaco_mais_proximo_do_centro():
+    assert dividir_texto("Os Paralamas do Sucesso") == ("Os Paralamas", "do Sucesso")
+    assert dividir_texto("Buena Vista Social Club") == ("Buena Vista", "Social Club")
+    assert dividir_texto("Tom Jobim") == ("Tom", "Jobim")
+
+
+def test_texto_sem_espaco_fica_em_uma_linha():
+    assert dividir_texto("Nirvana") == ("Nirvana",)
+    assert dividir_texto("42") == ("42",)
+
+
+def test_celula_quebrada_aparece_inteira_no_pdf():
+    cfg = ConfiguracaoJogo(
+        tipo="palavras",
+        palavras=("Os Paralamas do Sucesso",) + tuple(f"artista{i}" for i in range(9)),
+        linhas=3, colunas=3, centro_livre=False,
+    )
+    folha = gerar_folha(cfg)
+    texto = _paginas(gerar_pdf_folha(folha, cfg))[0].extract_text()
+    for celula in folha:
+        for parte in dividir_texto(celula):
+            assert parte in texto
+
+
+def test_quebrar_em_duas_linhas_aumenta_a_fonte():
+    """Nomes longos com espaço devem sair maiores do que sairiam em linha única."""
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas as reportlab_canvas
+
+    from bingo.pdf import FONTE_CELULA, _linhas_das_celulas, _tamanho_fonte_celula
+
+    c = reportlab_canvas.Canvas(io.BytesIO(), pagesize=A4)
+    nomes = ("Os Paralamas do Sucesso", "Buena Vista Social Club", "Queen")
+    lado = 100.0
+    quebrado = _tamanho_fonte_celula(c, _linhas_das_celulas(nomes), lado)
+    inteiro = _tamanho_fonte_celula(c, tuple((n,) for n in nomes), lado)
+    assert quebrado > inteiro

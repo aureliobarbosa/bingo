@@ -20,19 +20,45 @@ FONTE_CELULA = "Helvetica-Bold"
 CINZA_CENTRO = 0.92
 PROPORCAO_FONTE = 0.45  # tamanho inicial da fonte da célula, relativo ao lado
 MARGEM_TEXTO = 0.85  # fração do lado que o texto pode ocupar
+ENTRELINHA = 1.15  # espaçamento entre as linhas de uma mesma célula
 
 
-def _tamanho_fonte_celula(c: canvas.Canvas, folha: Folha, lado: float) -> float:
-    """Maior fonte em que todos os textos da folha cabem na célula."""
-    textos = [t for t in folha if t]
+def dividir_texto(texto: str) -> tuple[str, ...]:
+    """Quebra o texto em duas linhas, no espaço mais próximo do centro.
+
+    Textos sem espaço (números, palavras únicas) ficam em uma linha só. Dividir
+    encurta a linha mais larga da folha, o que permite uma fonte bem maior.
+    """
+    espacos = [i for i, ch in enumerate(texto) if ch == " "]
+    if not espacos:
+        return (texto,)
+    meio = len(texto) / 2
+    corte = min(espacos, key=lambda i: abs(i - meio))
+    return (texto[:corte], texto[corte + 1 :])
+
+
+def _linhas_das_celulas(folha: Folha) -> tuple[tuple[str, ...], ...]:
+    return tuple(dividir_texto(t) for t in folha if t)
+
+
+def _tamanho_fonte_celula(
+    c: canvas.Canvas, linhas_das_celulas: tuple[tuple[str, ...], ...], lado: float
+) -> float:
+    """Maior fonte em que todas as células da folha cabem, em largura e altura."""
     tamanho = lado * PROPORCAO_FONTE
-    if not textos:
+    todas = [linha for celula in linhas_das_celulas for linha in celula]
+    if not todas:
         return tamanho
-    largura_max = lado * MARGEM_TEXTO
-    mais_largo = max(textos, key=lambda t: c.stringWidth(t, FONTE_CELULA, 100))
-    largura_a_100 = c.stringWidth(mais_largo, FONTE_CELULA, 100)
+
+    # Largura: limitada pela linha mais larga da folha.
+    mais_larga = max(todas, key=lambda t: c.stringWidth(t, FONTE_CELULA, 100))
+    largura_a_100 = c.stringWidth(mais_larga, FONTE_CELULA, 100)
     if largura_a_100 > 0:
-        tamanho = min(tamanho, largura_max * 100 / largura_a_100)
+        tamanho = min(tamanho, lado * MARGEM_TEXTO * 100 / largura_a_100)
+
+    # Altura: limitada pela célula com mais linhas.
+    mais_linhas = max(len(celula) for celula in linhas_das_celulas)
+    tamanho = min(tamanho, lado * MARGEM_TEXTO / (mais_linhas * ENTRELINHA))
     return tamanho
 
 
@@ -78,7 +104,7 @@ def desenhar_folha(
     x0 = MARGEM + (disp_largura - grade_largura) / 2
     y0 = MARGEM + ALTURA_RODAPE + (disp_altura - grade_altura) / 2
 
-    tamanho_fonte = _tamanho_fonte_celula(c, folha, lado)
+    tamanho_fonte = _tamanho_fonte_celula(c, _linhas_das_celulas(folha), lado)
 
     for posicao, texto in enumerate(folha):
         linha, coluna = divmod(posicao, cfg.colunas)
@@ -96,8 +122,15 @@ def desenhar_folha(
 
         if texto is not None:
             c.setFont(FONTE_CELULA, tamanho_fonte)
-            # Centralização vertical aproximada pela altura das maiúsculas.
-            c.drawCentredString(x + lado / 2, y + (lado - tamanho_fonte * 0.7) / 2, texto)
+            linhas_texto = dividir_texto(texto)
+            passo = tamanho_fonte * ENTRELINHA
+            # Bloco de linhas centrado na célula; o 0,25 compensa opticamente a
+            # altura das maiúsculas, que ficam acima da linha de base.
+            primeira = (
+                y + lado / 2 + len(linhas_texto) * passo / 2 - passo + tamanho_fonte * 0.25
+            )
+            for numero, linha_texto in enumerate(linhas_texto):
+                c.drawCentredString(x + lado / 2, primeira - numero * passo, linha_texto)
 
     # Contorno externo mais forte.
     c.setLineWidth(2)
