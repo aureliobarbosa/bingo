@@ -271,15 +271,20 @@ imagem precisa ser legível pelo PIL. Falta limitar **formato** (PNG e JPEG),
 aceita e trafega inteira a cada atualização do preview. Validar no backend, que é
 a autoridade, e também no frontend, para avisar antes de enviar.
 
-### 6.1.4 Botão "Restaurar padrões"
+### 6.1.4 Botão "Restaurar padrões" — **dispensado**
 
-Os parâmetros ficam no `localStorage` do navegador (`bingo.configuracao`), e hoje só
-dá para voltar aos valores padrão pelo console do navegador — inaceitável para um
-serviço público. Um botão no painel limpa a chave e recarrega o formulário. A
-preferência de tema (`bingo.tema`) fica de fora, por ser configuração de exibição e
-não do jogo.
+Descartado por decisão do usuário, com o motivo registrado para não ser reaberto
+por engano: **nenhum estado salvo deixa o usuário preso**. Todos os campos são
+editáveis na tela e a validação impede salvar configuração inválida, então
+restaurar padrões seria conveniência, não recuperação — e um controle a mais
+competindo por atenção num painel que já tem quatro blocos e três botões.
 
-Arquivo: `static/app.js` e `static/index.html`.
+Em troca, `restaurar()` em `static/app.js` foi blindada: o preenchimento inteiro
+fica dentro de um `try` e, diante de estado salvo ilegível ou de outro formato,
+cai para os padrões do HTML. Sem isso, um `localStorage` com formato inesperado
+mataria a inicialização no meio — sem preview, sem eventos ligados e sem saída
+pela interface, que é o único cenário em que o botão faria falta (e no qual ele
+também já não funcionaria).
 
 ### 6.1.5 Limitar o número de folhas às combinações possíveis (backend)
 

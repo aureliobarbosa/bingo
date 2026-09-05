@@ -307,28 +307,33 @@ function salvar(cfg) {
   }
 }
 
+/* Não há botão de restaurar padrões: todos os campos são editáveis na tela, e a
+ * validação impede salvar configuração inválida. Em compensação, esta função
+ * precisa ser à prova de estado estranho — se ela lançar, a inicialização morre
+ * no meio e aí sim o usuário fica sem saída pela interface. */
 function restaurar() {
-  let cfg;
   try {
-    cfg = JSON.parse(localStorage.getItem(CHAVE_ARMAZENAMENTO) || "null");
-  } catch (erro) {
-    return;
-  }
-  if (!cfg) return;
+    const cfg = JSON.parse(localStorage.getItem(CHAVE_ARMAZENAMENTO) || "null");
+    if (!cfg) return;
 
-  el.titulo.value = cfg.titulo ?? el.titulo.value;
-  el.subtitulo.value = cfg.subtitulo ?? "";
-  el.numeroElementos.value = cfg.numero_elementos ?? el.numeroElementos.value;
-  // Mantém a lista de exemplo do HTML quando nada de útil foi salvo.
-  if (cfg.palavras && cfg.palavras.length > 0) {
-    el.palavras.value = cfg.palavras.join("\n");
+    el.titulo.value = cfg.titulo ?? el.titulo.value;
+    el.subtitulo.value = cfg.subtitulo ?? "";
+    el.numeroElementos.value = cfg.numero_elementos ?? el.numeroElementos.value;
+    // Mantém a lista de exemplo do HTML quando nada de útil foi salvo.
+    if (Array.isArray(cfg.palavras) && cfg.palavras.length > 0) {
+      el.palavras.value = cfg.palavras.join("\n");
+    }
+    el.linhas.value = cfg.linhas ?? el.linhas.value;
+    el.colunas.value = cfg.colunas ?? el.colunas.value;
+    el.numeroFolhas.value = cfg.numero_folhas ?? el.numeroFolhas.value;
+    // `??` e não `Boolean()`: ausente significa manter o padrão, não desmarcar.
+    el.centroLivre.checked = cfg.centro_livre ?? el.centroLivre.checked;
+    const radio = document.getElementById(`tipo-${cfg.tipo}`);
+    if (radio) radio.checked = true;
+  } catch (erro) {
+    // Estado salvo ilegível ou de outro formato: seguir com os padrões do HTML.
+    el.form.reset();
   }
-  el.linhas.value = cfg.linhas ?? el.linhas.value;
-  el.colunas.value = cfg.colunas ?? el.colunas.value;
-  el.numeroFolhas.value = cfg.numero_folhas ?? el.numeroFolhas.value;
-  el.centroLivre.checked = Boolean(cfg.centro_livre);
-  const radio = document.getElementById(`tipo-${cfg.tipo}`);
-  if (radio) radio.checked = true;
 }
 
 /* --------------------------------------------------------------------- logo */
