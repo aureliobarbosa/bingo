@@ -1,23 +1,45 @@
 "use strict";
 
-/* Camada de acesso ao servidor.
- * Nesta etapa a interface é construída sem backend: os dois métodos devolvem
- * sempre o mesmo PDF de exemplo. Na etapa de conexão só o corpo destes dois
- * métodos muda — o resto do arquivo continua igual. */
+/* Camada de acesso ao servidor: todo o tráfego HTTP da interface passa por aqui. */
 const Api = {
   async preview(cfg) {
-    return await exemploPdf();
+    return await pedirPdf("/api/preview", cfg);
   },
 
   async baixarJogo(cfg) {
-    return await exemploPdf();
+    return await pedirPdf("/api/jogo", cfg);
   },
 };
 
-async function exemploPdf() {
-  const resposta = await fetch("/static/exemplo.pdf");
-  if (!resposta.ok) throw new Error("Não foi possível carregar o PDF de exemplo.");
+async function pedirPdf(rota, cfg) {
+  const resposta = await fetch(rota, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cfg),
+  });
+  if (!resposta.ok) {
+    throw new Error(await mensagemDoServidor(resposta));
+  }
   return await resposta.blob();
+}
+
+/* O backend responde 422 de duas formas: uma regra de negócio devolve `detail`
+ * como texto; uma violação de schema devolve uma lista de erros por campo. */
+async function mensagemDoServidor(resposta) {
+  try {
+    const corpo = await resposta.json();
+    if (typeof corpo.detail === "string") {
+      return corpo.detail;
+    }
+    if (Array.isArray(corpo.detail)) {
+      return corpo.detail
+        .map((e) => `${(e.loc || []).slice(1).join(".")}: ${e.msg}`)
+        .join("; ");
+    }
+  } catch (erro) {
+    /* Resposta sem JSON: cai na mensagem genérica. */
+  }
+  return `Não foi possível gerar o PDF (erro ${resposta.status}).`;
 }
 
 /* ---------------------------------------------------------------- elementos */
@@ -182,17 +204,22 @@ function sincronizarInterface() {
   return { cfg, problema };
 }
 
+let ultimoPedido = 0;
+
 async function atualizarPreview() {
   const { cfg, problema } = sincronizarInterface();
   if (problema) return;
 
+  const pedido = ++ultimoPedido;
   ocupado(true);
   try {
-    exibirPdf(await Api.preview(cfg));
+    const pdf = await Api.preview(cfg);
+    if (pedido !== ultimoPedido) return; // chegou atrasado: já há pedido mais novo
+    exibirPdf(pdf);
   } catch (erro) {
-    mostrarErro(erro.message);
+    if (pedido === ultimoPedido) mostrarErro(erro.message);
   } finally {
-    ocupado(false);
+    if (pedido === ultimoPedido) ocupado(false);
   }
 }
 
@@ -204,6 +231,9 @@ async function baixar() {
     return;
   }
   ocupado(true);
+  const rotulo = el.btnBaixar.textContent;
+  el.btnBaixar.disabled = true;
+  el.btnBaixar.textContent = "Gerando…";
   try {
     const blob = await Api.baixarJogo(cfg);
     const url = URL.createObjectURL(blob);
@@ -217,6 +247,8 @@ async function baixar() {
   } catch (erro) {
     mostrarErro(erro.message);
   } finally {
+    el.btnBaixar.textContent = rotulo;
+    el.btnBaixar.disabled = false;
     ocupado(false);
   }
 }

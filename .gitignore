@@ -14,4 +14,3 @@ wheels/
 
 # PDFs gerados
 *.pdf
-!static/exemplo.pdf
