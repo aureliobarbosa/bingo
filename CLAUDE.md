@@ -73,6 +73,12 @@ navegador (chaves `bingo.configuracao` e `bingo.tema`).
 - **`RAIZ_PROJETO`** (em `src/bingo/pdf.py`) é calculada a partir do arquivo-fonte,
   então `static/` precisa acompanhar a árvore do projeto — instalar apenas o wheel
   deixaria o diretório e o logo de fora. Isso é decisão da Etapa 7 (container).
+- **O navegador guarda `static/` em cache.** `StaticFiles` serve sem versão na URL
+  nem cabeçalho de cache, então depois de editar `app.js` o navegador pode
+  continuar rodando a versão antiga — o que já levou a diagnósticos errados. Ao
+  conferir uma mudança na interface, recarregue ignorando o cache
+  (`Ctrl+Shift+R`) ou use uma janela anônima. A correção definitiva é decisão da
+  Etapa 8.
 - **Chrome headless não renderiza PDF** dentro de `iframe`; o `iframe` aparece
   preto nos screenshots mesmo com tudo funcionando. Verifique pelo DOM
   (`preview.src` começa com `blob:`). **Firefox headless não roda neste ambiente**

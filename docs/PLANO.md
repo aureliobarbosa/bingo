@@ -262,6 +262,14 @@ Em ambos os casos é preciso validar formato (PNG/JPEG), dimensões e tamanho m�
 já que o serviço vai ficar exposto na internet — ver as questões de segurança da
 Etapa 8.
 
+### 6.1.3.v Validação do arquivo enviado
+
+Hoje só há duas checagens: o data URI precisa começar com `data:image/` e a
+imagem precisa ser legível pelo PIL. Falta limitar **formato** (PNG e JPEG),
+**dimensões** e **tamanho máximo** — sem teto, uma imagem de dezenas de MB é
+aceita e trafega inteira a cada atualização do preview. Validar no backend, que é
+a autoridade, e também no frontend, para avisar antes de enviar.
+
 ### 6.1.4 Botão "Restaurar padrões"
 
 Os parâmetros ficam no `localStorage` do navegador (`bingo.configuracao`), e hoje só
@@ -394,6 +402,11 @@ Decisões de operação, todas ainda em aberto:
 
 - **Servidor**: `uvicorn` sozinho ou atrás de um proxy reverso (nginx, Caddy,
   Traefik); número de workers; timeouts.
+- **Cache dos arquivos estáticos**: `/static/*` é servido sem versão na URL nem
+  cabeçalho de cache, então o navegador continua executando o `app.js` antigo
+  depois de um deploy. Durante o desenvolvimento isso já obrigou a limpar o cache
+  e reiniciar o navegador para ver uma correção. Resolver com versão na URL
+  (`/static/app.js?v=…`) ou cabeçalhos de cache adequados.
 - **Nuvem**: escolher o destino (VPS, Fly.io, Render, Cloud Run…) pesando custo,
   facilidade e limites de CPU — a geração de PDF é trabalho de CPU, não de I/O.
 - **Segurança**, vinculada às escolhas acima:
