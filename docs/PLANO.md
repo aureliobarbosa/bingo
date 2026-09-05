@@ -1,8 +1,8 @@
 # Sistema de Bingo via Web — Plano de Implementação
 
 > **Andamento** — Etapas 0 a 6 concluídas (backend, PDF, API, interface e conexão),
-> mais o logo na célula central. Pendentes: 6.1 (refinamentos), 7 (container),
-> 8 (servidor, nuvem e segurança) e 9 (documentação).
+> mais o logo na célula central. Pendentes: 6.1 (refinamentos, sete itens),
+> 7 (container), 8 (servidor, nuvem e segurança) e 9 (documentação).
 
 ## Contexto
 
@@ -271,6 +271,99 @@ preferência de tema (`bingo.tema`) fica de fora, por ser configuração de exib
 não do jogo.
 
 Arquivo: `static/app.js` e `static/index.html`.
+
+### 6.1.5 Limitar o número de folhas às combinações possíveis (backend)
+
+Hoje o número de folhas é limitado apenas pelo teto `MAX_FOLHAS = 500`. Ele deve
+passar a ser limitado também pela quantidade de folhas distintas que o universo
+permite formar.
+
+**Expressão a implementar** — folhas tratadas como *conjuntos* de elementos, isto é,
+duas folhas com os mesmos elementos em ordens diferentes contam como uma só:
+
+```
+                        n!
+máximo de folhas = C(n, k) = ─────────────
+                     k! · (n − k)!
+```
+
+com `n = len(cfg.universo)` (elementos disponíveis) e `k = cfg.elementos_por_folha`
+(células sorteadas, já descontando o centro livre). Em Python é `math.comb(n, k)`,
+da biblioteca padrão.
+
+O limite efetivo passa a ser `min(MAX_FOLHAS, math.comb(n, k))`, e a validação vive
+em `ConfiguracaoJogo.validar()`, como as demais regras.
+
+**Verificação manual pedida ao usuário antes de implementar:**
+
+1. **Confirmar a interpretação.** Se folhas com os mesmos elementos em ordens
+   diferentes forem consideradas *diferentes*, a fórmula não é a combinação e sim o
+   arranjo, `n! / (n − k)!`, um número muito maior. O item 6.1.7 indica que a
+   intenção é a combinação — confirmar.
+2. **Conferir estes valores**, calculados com `math.comb`:
+
+   | n | k | C(n, k) |
+   |---|---|---|
+   | 9 | 8 | 9 |
+   | 10 | 8 | 45 |
+   | 20 | 16 | 4.845 |
+   | 50 | 24 | ≈ 1,2 × 10¹⁴ |
+   | 75 | 24 | ≈ 2,6 × 10¹⁹ |
+
+**Observação sobre o alcance real da regra.** Em grades comuns o número de
+combinações é astronômico, então quem limita continua sendo `MAX_FOLHAS`. A nova
+regra só morde em universos pequenos — por exemplo 9 elementos numa grade 3×3 com
+centro livre, onde existem apenas 9 folhas distintas possíveis.
+
+**Ponto a decidir junto:** o gerador hoje faz sorteio simples e *não* verifica se
+duas folhas saíram iguais (decisão da Etapa 2). O limite `C(n, k)` impede pedir mais
+folhas do que existem combinações, mas não garante que as folhas geradas sejam
+distintas entre si. Garantir isso é uma mudança adicional no gerador — decidir se
+entra junto ou fica para depois.
+
+### 6.1.6 Mostrar o máximo de folhas na interface
+
+O rótulo do campo de número de folhas passa a exibir o valor calculado em 6.1.5,
+recalculado a cada mudança de parâmetro:
+
+```
+Número de folhas: (de {maximo_folhas}
+```
+
+**Texto a fechar com o usuário:** o parêntese fica aberto na especificação. Formas
+possíveis: `Número de folhas (máximo: {maximo_folhas})` ou
+`Número de folhas (de 1 a {maximo_folhas})`.
+
+O cálculo precisa existir nos dois lados: no backend, como validação, e no frontend,
+para exibir o número sem ida ao servidor. O JavaScript não tem `math.comb`, então
+será preciso escrever a combinação — cuidado com o estouro de precisão, já que
+`C(75, 24)` passa muito de `Number.MAX_SAFE_INTEGER`. Duas saídas a avaliar:
+`BigInt`, ou limitar o cálculo a `MAX_FOLHAS` (basta saber se o máximo é maior que
+500, não o valor exato).
+
+Arquivos: `static/index.html` e `static/app.js`.
+
+### 6.1.7 Avaliar conjuntos no lugar de tuplas para as folhas
+
+Avaliação de estrutura de dados, motivada pelos dois itens acima. Usar `frozenset`
+para representar o conteúdo de uma folha torna natural o que hoje é trabalhoso:
+
+- comparar duas folhas ignorando a ordem dos elementos, que é exatamente a noção de
+  "folha repetida" adotada em 6.1.5;
+- detectar folhas idênticas em tempo constante, guardando as já sorteadas num
+  conjunto de `frozenset`, em vez de comparar par a par.
+
+**Restrição a respeitar:** a folha também precisa manter a **ordem** das células,
+porque é ela que define a posição de cada elemento na grade impressa e a posição do
+centro livre. Um conjunto sozinho perde essa informação. O desenho provável é
+manter a tupla ordenada como a representação da folha e usar `frozenset` apenas como
+chave de comparação, não como substituto.
+
+Avaliar também o `universo` em `ConfiguracaoJogo`: a checagem de palavras repetidas
+já constrói um `set` a cada validação.
+
+Refatoração posterior, sem pressa: fazer depois que 6.1.5 e 6.1.6 estiverem prontos,
+com os testes existentes servindo de rede de segurança.
 
 Commit por item, como nas demais etapas.
 
