@@ -15,7 +15,7 @@ decisão.
 
 ```bash
 uv sync                                    # cria o ambiente (baixa o Python 3.14)
-uv run pytest -q                           # 52 testes
+uv run pytest -q                           # 55 testes
 uv run uvicorn bingo.api:app --reload      # http://127.0.0.1:8000
 ```
 
@@ -90,6 +90,10 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   valida o que é barato (cabeçalho do data URI e comprimento do base64) e
   `pdf.py` o que exige abrir a imagem. A margem clara em volta do logo é
   recortada na geração, senão o desenho ocupa ~60% da célula.
+- **Limites de entrada**, porque o serviço vai ficar aberto: corpo da requisição
+  em 4 MB (413), logo em 2 MB conferidos pelo `max_length` do campo antes de o
+  Pydantic materializar a string, e 50 caracteres por palavra — acima disso o
+  texto não cabe na célula e encolhe a fonte da folha toda.
 - **Número de folhas limitado por C(n, k)**, o total de folhas distintas que o
   universo permite: `combinacoes_possiveis` e `maximo_folhas` em `models.py`. O
   JavaScript refaz a conta saturando o produto em `MAX_FOLHAS`, o que dispensa
@@ -118,9 +122,10 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   conferir uma mudança na interface, recarregue ignorando o cache
   (`Ctrl+Shift+R`) ou use uma janela anônima. A correção definitiva é decisão da
   Etapa 8.
-- **`MAX_FOLHAS` está em três lugares** e precisam mudar juntos:
-  `src/bingo/models.py`, a constante no topo de `static/app.js` e o atributo `max`
-  do campo em `static/index.html`.
+- **As constantes de limite vivem em três lugares** e mudam juntas:
+  `src/bingo/models.py` (a autoridade), a constante no topo de `static/app.js` e
+  o atributo do campo em `static/index.html`. Já vale para `MAX_FOLHAS` e
+  `MAX_PALAVRA_CARACTERES`, e valerá para `MAX_ELEMENTOS` na Etapa 6.3.
 - **Input de arquivo: limpar `value` depois de ler.** Sem isso, escolher o mesmo
   arquivo outra vez não dispara `change` e a interface parece morta — isso já
   custou uma sessão inteira de diagnóstico. E **não aninhe o `<input>` dentro do

@@ -1,8 +1,9 @@
 # Bingo — o que falta fazer
 
-> **Andamento** — Etapas 0 a 7 concluídas: backend, PDF, API, interface, conexão,
-> os refinamentos de 6.1 e o container. Restam a 8.1 (integração contínua), a 8.2
-> (publicação no Cloud Run), a 8.3 (cache e segurança) e a 9 (documentação).
+> **Andamento** — Etapas 0 a 7 concluídas, mais a 6.2 (limites de entrada).
+> Restam a 6.3 (teto do universo), a 8.1 (integração contínua), a 8.2 (Cloud
+> Run), a 8.3 (limite de taxa e cache), a 9 (arquivo de configuração) e a 10
+> (documentação).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
 ao mexer numa área pronta; não é preciso lê-lo inteiro para começar uma etapa. O
@@ -13,7 +14,51 @@ resumo de uma linha por decisão está no [CLAUDE.md](../CLAUDE.md).
 Serviço *stateless* que gera cartelas de bingo em PDF para impressão: FastAPI e
 reportlab no backend, Bootstrap 5 com JavaScript sem build step no frontend. O
 devcontainer e a imagem de produção saem do mesmo `Dockerfile`, com base única
-nos três estágios. Os 52 testes passam. Falta publicar.
+nos três estágios. Os 55 testes passam. Falta publicar.
+
+**Origem das etapas 6.2 a 9:** um briefing produzido numa sessão paralela sobre
+hospedagem, servidor e armazenamento, conferido contra o código. Ele confirmou
+as decisões da Etapa 8 e acrescentou o arquivo de configuração e a semente; a
+conferência revelou os buracos de validação das etapas 6.2 e 6.3.
+
+---
+
+## Etapa 6.3 — Universo máximo de 100 elementos
+
+`numero_elementos` é o **tamanho do universo**: em `models.py` o universo de tipo
+`numeros` é `1..numero_elementos`, e no `app.js` a função `disponiveis()` devolve
+`numero_elementos` para números e `palavras.length` para palavras. São o mesmo
+conceito e devem ter o mesmo teto.
+
+Hoje o teto é `le=10_000` em `api.py` e `max="10000"` em `index.html` — alto
+demais para um bingo impresso, e um vetor de consumo: `universo` materializa a
+tupla e `combinacoes_possiveis` roda `math.comb` sobre ela. E a quantidade de
+palavras não tem teto nenhum.
+
+**Uma constante só, `MAX_ELEMENTOS = 100`** em `models.py`, valendo para
+`numero_elementos` e para `len(palavras)`.
+
+Onde mexer — é o mesmo trio da armadilha do `MAX_FOLHAS`:
+
+- `src/bingo/models.py` — a constante e a regra em `validar()`
+- `src/bingo/api.py` — `le=MAX_ELEMENTOS` e `max_length` da lista de palavras
+- `static/app.js` — a constante e a checagem em `validar()`, que hoje **não tem
+  teto superior algum** para o universo
+- `static/index.html` — `max="100"` no campo
+
+Aproveitar para trocar o literal `100` do `app.js` por uma constante
+`MAX_CELULAS`, que é a mesma duplicação sem nome.
+
+**Consequência aceita:** a validação exige universo *estritamente maior* que os
+elementos por folha. Com o universo em 100 e `MAX_CELULAS` em 100, uma grade de
+exatamente 100 células (10×10, 5×20, 20×5 — todas de lados pares, portanto sem
+centro livre) passa a ser impossível, porque exigiria 101 elementos. Grades de
+até 99 células seguem funcionando. Decisão do usuário, tomada com a consequência
+à vista; se um dia o 10×10 fizer falta, o teto vira 101.
+
+Testes: teto aceito, teto + 1 recusado, nos dois tipos.
+
+Commit: `fix: limita o universo do bingo a 100 elementos`.
 
 ---
 
@@ -44,67 +89,110 @@ Commit: `chore: integração contínua no GitHub Actions`.
 
 ### 8.2 Publicação no Google Cloud Run
 
-**Decisão tomada**, com as alternativas avaliadas e descartadas:
+**Decisão tomada:** Cloud Run. As alternativas avaliadas e o motivo do descarte
+de cada uma estão em [DECISOES.md](DECISOES.md).
 
-| Opção | Por que não |
-|---|---|
-| Hugging Face Spaces | Sem cartão e o mais fácil de publicar, mas lido como vitrine de demonstração; perde valor como peça de portfólio |
-| Render | Dorme em ~15 min e acorda em dezenas de segundos — péssimo para quem abre o link uma vez por mês |
-| Azure Container Apps | Equivalente ao Cloud Run, sem vantagem que justifique a troca |
-| Fly.io | Modelo gratuito mudou ao longo dos anos; incerto |
-| Oracle Always Free | Sempre ligada, mas exige administrar TLS, firewall e atualizações |
+**`PORT` no `Dockerfile`.** O `CMD` fixa 8000 e o Cloud Run injeta 8080. A forma
+exec não expande variáveis; usar
+`CMD ["sh", "-c", "exec uvicorn bingo.api:app --host 0.0.0.0 --port ${PORT:-8000}"]`.
+O `exec` importa: sem ele o uvicorn não é PID 1 e perde o `SIGTERM` do
+encerramento. O `HEALTHCHECK` também fixa 8000 — o Cloud Run o ignora, mas ele
+vale localmente e deve seguir a mesma variável.
 
-Pesou também um critério não técnico: o projeto serve de **portfólio**, e o Cloud
-Run comunica competência de operação que uma plataforma de demonstração não
-comunica. Vale lembrar, porém, que o diferencial de portfólio não é a plataforma
-e sim o que existe em volta — CI, salvaguardas de custo e o registro das decisões.
+**Um único worker**, como já está: o Cloud Run escala criando instâncias, não
+fazendo fork de workers. Vários só multiplicariam a memória por instância.
 
-Trabalho previsto:
+**`--proxy-headers --forwarded-allow-ips='*'`**, que deixa de ser opcional: o
+limite de taxa por IP da 8.3 depende do `X-Forwarded-For`. Confiar em qualquer
+proxy é aceitável porque o contêiner só recebe tráfego do Google Front End.
 
-1. **Respeitar a variável `PORT`** — o Cloud Run injeta 8080 e o `CMD` fixa 8000.
-   É a única mudança de código desta etapa.
-2. **Autenticar o Actions por Workload Identity Federation**, sem chave de conta
-   de serviço guardada no repositório.
-3. Publicar no **Artifact Registry** e implantar no Cloud Run, região
-   `southamerica-east1`.
-4. **Salvaguardas**, dimensionadas pelo que foi medido: `--memory 256Mi`,
-   `--cpu 1`, `--max-instances` baixo, timeout de requisição e alerta de
-   orçamento na conta — para que uma anomalia de tráfego não vire fatura.
+**Publicação:** Workload Identity Federation no Actions, sem chave de conta de
+serviço no repositório; Artifact Registry; região `southamerica-east1`.
+
+**Salvaguardas**, dimensionadas pelo que foi medido: `--memory 256Mi`,
+`--cpu 1`, `--min-instances 0`, `--max-instances 3`, timeout de requisição e
+alerta de orçamento na conta. Com o serviço aberto, o teto de instâncias é o que
+limita a exposição financeira.
 
 Verificação: abrir a URL pública, gerar um PDF, conferir páginas e logo, e medir
 a partida a frio real.
 
 Commit: `chore: publica o serviço no Cloud Run`.
 
-### 8.3 Segurança e cache
+### 8.3 Limite de taxa, cache e cabeçalhos
 
-- **nginx está descartado.** Ele não substitui o `uvicorn` — não executa Python;
-  seria um proxy *na frente* dele. A plataforma já entrega TLS, domínio e
-  roteamento, e a carga projetada dispensa qualquer proxy. Só voltaria a fazer
-  sentido numa VPS administrada por nós.
-- **Cache dos arquivos estáticos**: `/static/*` é servido sem versão na URL nem
-  cabeçalho de cache. Enquanto era só desenvolvimento, o incômodo era limpar o
-  cache do navegador; **com deploy, vira defeito** — usuários continuariam
-  rodando o `app.js` antigo depois de uma correção. Resolver com versão na URL
-  (`/static/app.js?v=…`) ou cabeçalhos adequados.
-- Limite de taxa por IP: gerar um jogo cheio é o pedido mais caro, e a rota é
-  aberta e sem autenticação — é o vetor de abuso mais óbvio.
-- Limite de tamanho do corpo da requisição, cabeçalhos de segurança e timeout de
-  geração. CORS segue desnecessário: frontend e API são a mesma origem.
+Os limites de tamanho já foram resolvidos na 6.2.
 
-Commit: `chore: cache dos estáticos e limites de segurança`.
+- **Limite de taxa por IP** — middleware com dicionário em memória e biblioteca
+  padrão, seguindo a convenção do projeto. Com `--max-instances 3` o limite
+  efetivo é até 3× o configurado e zera quando a instância recicla: serve para
+  conter bot em laço, não atacante determinado. Registrar a limitação junto do
+  código.
+- **Cache dos estáticos** — subclasse de `StaticFiles` enviando
+  `Cache-Control: no-cache`, que força revalidação (o ETag resolve em 304).
+  Elimina a armadilha do `app.js` velho sem introduzir versão na URL, que
+  exigiria o build step que o projeto não tem. Com ~10 usuários por ano,
+  revalidar não custa nada.
+- **Cabeçalhos de segurança e timeout de geração.** CORS segue desnecessário:
+  frontend e API são a mesma origem.
+- **nginx está descartado** — ver o motivo em [DECISOES.md](DECISOES.md).
 
-## Etapa 9 — Documentação
+Commit: `chore: limite de taxa, cache dos estáticos e cabeçalhos`.
 
-Escrita depois que o container e o servidor estiverem definidos, para descrever o
-que de fato existe.
+---
+
+## Etapa 9 — Configuração em arquivo JSON
+
+Hoje a configuração fica no `localStorage`, que **não guarda o logo**: alguns MB
+estourariam a cota. Ao recarregar a página o logo volta a ser o padrão. Um
+arquivo exportável resolve isso e ainda sobrevive a limpeza de navegador, troca
+de máquina e reimagem de laboratório pela TI da escola — e pode ser mandado por
+e-mail para um colega, o que vira compartilhamento sem custo de código.
+
+O `localStorage` **continua**, como conveniência no mesmo navegador; o arquivo é
+o caminho durável.
+
+**Semente.** Campo `semente: int | None = None` em `ConfiguracaoJogo`;
+`gerador.py` passa a usar `random.Random(cfg.semente)` num caminho único — com
+`None` o `Random` sorteia da entropia do sistema, então não há ramo condicional.
+Sem semente gravada, regerar a partir de uma configuração salva produz cartelas
+diferentes das já impressas, e o arquivo salvo vale pela metade.
+
+A propriedade que faz o preview valer: `gerar_jogo` sorteia a primeira folha
+antes de qualquer descarte por repetição, então `gerar_folha` com um
+`Random(semente)` recém-criado devolve exatamente a primeira folha do jogo. O
+preview passa a mostrar a cartela que vai sair impressa.
+
+Ressalva a registrar junto do código: o Python não garante formalmente que
+`random.sample` produza a mesma sequência entre versões. O risco é baixo e o
+campo `version` do arquivo dá saída se um dia importar.
+
+**Arquivo.** A mesma forma do objeto que a API já aceita, mais `version: 1` e
+`semente`, com o logo como data URI. Exportar com `Blob` +
+`URL.createObjectURL` + `<a download>`; importar com `<input type="file">`.
+
+Duas armadilhas já registradas no `CLAUDE.md` valem aqui e devem ser reusadas,
+não redescobertas: **limpar o `value` do input depois de ler** e **não aninhar o
+`<input>` dentro do `<label>`** que serve de botão. E a importação **não pode
+lançar**, pela mesma razão que `restaurar()` não pode: arquivo de outra versão ou
+corrompido vira mensagem na interface, não inicialização morta.
+
+**Botão "Sortear de novo"** em `index.html`, que gera nova semente e atualiza o
+preview.
+
+Commits: um para a semente com seus testes, outro para exportar/importar.
+
+## Etapa 10 — Documentação
+
+Escrita depois que o container, o servidor e o arquivo de configuração
+estiverem definidos, para descrever o que de fato existe.
 
 `README.md` com: o que é, como rodar localmente
 (`uv run uvicorn bingo.api:app --reload`), como rodar os testes (`uv run pytest`),
-como construir e executar o container, e como está implantado.
+como construir e executar o container, como está implantado e como usar o
+arquivo de configuração.
 
 Commit: `docs: README com instruções de uso e deploy`.
-
 
 ---
 

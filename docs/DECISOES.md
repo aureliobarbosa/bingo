@@ -411,6 +411,41 @@ Commit por item, como nas demais etapas.
 
 **Parar aqui e pedir avaliação do usuário.**
 
+## Etapa 6.2 — Limites de entrada que faltavam — **concluída**
+
+Levantada ao conferir contra o código um briefing sobre a publicação, que
+apontava "número máximo de palavras por requisição" como a única pendência de
+validação. Eram três, e com uma causa-raiz comum: **nada limitava o tamanho do
+corpo da requisição**, então ele era lido inteiro na memória antes de qualquer
+checagem.
+
+| Entrada | Antes | Agora |
+|---|---|---|
+| Corpo da requisição | sem limite | 4 MB, com 413 |
+| `logo_enviado` | 2 MB, conferidos em `models.py` | `max_length` no campo, antes do Pydantic materializar |
+| Cada palavra | sem limite | 50 caracteres |
+
+O teto de 4 MB vem do pior caso legítimo: um logo de 2 MB vira ~2,8 MB em
+base64, mais palavras e cabeçalho. O Cloud Run corta em 32 MiB; este é o limite
+da aplicação, mais apertado.
+
+**O middleware confere o `Content-Length`**, que é o que todo cliente honesto
+manda. Uma requisição em `chunked`, sem esse cabeçalho, escapa da checagem —
+fica contida pelos tetos de cada campo e pelo limite da plataforma. Contar bytes
+durante o streaming resolveria, e foi considerado desproporcional para o risco.
+
+**O limite do logo mudou de lugar, não de valor.** Os 2 MB já existiam em
+`_validar_logo`, mas só rodavam depois de o Pydantic construir a string inteira
+— tarde demais para servir de proteção. O `max_length` no campo é derivado de
+`MAX_LOGO_BYTES`, então continua havendo um só número a mudar.
+
+**As 50 letras por palavra são regra de impressão**, não de segurança: acima
+disso o texto não cabe na célula e encolhe a fonte da folha inteira, que é a
+mesma razão da quebra em duas linhas já registrada. Validado nos dois lados.
+
+O teto de *quantidade* de palavras não entrou aqui: é o tamanho do universo, e
+foi tratado junto com `numero_elementos` na 6.3.
+
 ## Etapa 7 — Container — **concluída**
 
 `Dockerfile` com três estágios e um `.devcontainer/devcontainer.json` que aponta
