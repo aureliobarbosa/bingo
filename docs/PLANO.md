@@ -461,6 +461,51 @@ que faça falta. Fica registrado aqui para não custar diagnóstico se surgir.
 
 Commit: `chore: instala git e a extensão do Claude no devcontainer`.
 
+### 7.2 Base única nos três estágios e versão do uv fixada — **concluída**
+
+Revisão da escolha de imagem, motivada pela pergunta de por que o projeto usava
+uma imagem da Astral. A investigação dentro do próprio container mostrou que
+`ghcr.io/astral-sh/uv:python3.14-bookworm-slim` **não traz um Python próprio da
+Astral**: as variáveis `PYTHON_VERSION`/`PYTHON_SHA256`, o layout `/usr/local`
+com `pip`, `idle` e `pydoc`, e o `CONFIG_ARGS`
+(`--enable-optimizations --with-lto --enable-shared`) são os do
+`docker-library/python`. `/root/.local/share/uv/python/` nem existe. Era, o tempo
+todo, o `python:3.14-slim-bookworm` com o binário do uv por cima — a mesma base
+de `producao`.
+
+Então a escolha estava certa, mas tinha uma folga: a tag não nomeia a versão do
+uv. O `uv.lock` fixa as dependências, e a ferramenta que o lê flutuava a cada
+rebuild. Os estágios `desenvolvimento` e `construcao` passaram a ser
+`python:3.14-slim-bookworm` mais `COPY --from=uv /uv /uvx /bin/`, com a versão
+num `ARG UV_VERSION` único (0.9.30, a que já estava em uso — a troca é neutra em
+comportamento).
+
+**A invariante que isso torna explícita**, e que era coincidência antes:
+`producao` recebe o `.venv` pronto de `construcao`, e **um venv não é relocável
+entre instalações diferentes de Python**. Ele grava o caminho absoluto do
+interpretador — `home = /usr/local/bin` no `pyvenv.cfg`, e `bin/python` é symlink
+para `/usr/local/bin/python3` — e carrega extensões compiladas contra uma libc
+(`cpython-314-x86_64-linux-gnu`). A cópia entre estágios só funciona porque as
+bases coincidem; com a base unificada, isso deixa de depender de a Astral
+continuar montando a imagem dela sobre a oficial.
+
+**Alpine foi avaliado e descartado.** É a troca de base mais tentadora para
+reduzir os 382 MB, e é exatamente a que quebra a invariante acima: musl muda a
+ABI, o `.venv` de `construcao` deixa de servir em `producao` e pillow e reportlab
+passam a depender de wheels musllinux. Com a carga projetada nesta etapa 8
+(2,7 requisições por dia), otimizar o tamanho da imagem é resolver um problema
+que não existe.
+
+Ganhos práticos: uma imagem base baixada em vez de duas em cada máquina, melhor
+reaproveitamento de cache no CI da 8.1, e subir de versão do Python vira uma
+linha em vez de duas em imagens diferentes.
+
+Exige **Rebuild Container**: mudar o `FROM` invalida toda a cadeia de camadas.
+Os `--mount=type=cache` do uv sobrevivem (são caches do BuildKit, não da imagem),
+então quem volta à rede é o apt e o npm.
+
+Commit: `chore: unifica a base das imagens e fixa a versão do uv`.
+
 ## Etapa 8 — Integração contínua e publicação
 
 ### Carga esperada, que sustenta as decisões abaixo
