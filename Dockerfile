@@ -88,10 +88,22 @@ COPY static/ ./static/
 RUN useradd --create-home --uid 1000 bingo && chown -R bingo:bingo /app
 USER bingo
 
+# Documenta a porta padrão. O Cloud Run injeta PORT=8080 e ignora o EXPOSE; as
+# duas instruções abaixo leem a variável para servir na porta certa nos dois
+# ambientes.
 EXPOSE 8000
 
+# Lê PORT em Python, e não na forma exec do CMD, que não expande variáveis.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD ["python", "-c", \
-         "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/').read(1)"]
+         "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '8000') + '/').read(1)"]
 
-CMD ["uvicorn", "bingo.api:app", "--host", "0.0.0.0", "--port", "8000"]
+# Forma shell porque a exec não expande ${PORT}. O `exec` mantém o uvicorn como
+# PID 1: sem ele o sh fica no lugar e engole o SIGTERM do encerramento.
+#
+# --proxy-headers com --forwarded-allow-ips: sem isso todo pedido chega com o IP
+# do proxy do Google, e o limite de taxa por IP da Etapa 8.3 veria o tráfego
+# inteiro como um cliente só. Confiar em qualquer proxy é aceitável porque o
+# contêiner só recebe tráfego do Google Front End.
+CMD ["sh", "-c", \
+     "exec uvicorn bingo.api:app --host 0.0.0.0 --port ${PORT:-8000} --proxy-headers --forwarded-allow-ips='*'"]
