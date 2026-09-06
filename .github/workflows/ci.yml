@@ -31,7 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10
+      # Versão completa, não `@v10`: o setup-uv parou de publicar tags móveis
+      # de major depois da v7, e `@v10` não existe — o job morre no "Set up job".
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
@@ -53,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
