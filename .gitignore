@@ -14,3 +14,6 @@ wheels/
 
 # PDFs gerados
 *.pdf
+
+# AI TOOLS
+.claude/
