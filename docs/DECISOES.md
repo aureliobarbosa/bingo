@@ -775,6 +775,23 @@ e-mail para um colega, o que vira um recurso sem custo de código. A desvantagem
 é ser manual, e alguém vai perder um arquivo. O `localStorage` **continua** como
 conveniência; o arquivo é o caminho durável.
 
+### Imagem: construir uma vez e promover pelo digest
+
+Decidido na 8.1, executado na 8.2. As duas formas consideradas:
+
+- **Reconstruir no deploy** — mais simples, sem credencial no CI, mas o que foi
+  testado não é literalmente o que é implantado.
+- **Construir uma vez e promover** — o CI empurra a imagem com a tag do SHA e o
+  deploy aponta o Cloud Run para o **digest**.
+
+Escolhida a segunda. Implanta-se o binário exato que passou nos testes, e o
+rollback vira apontar para o digest anterior. O digest, e não a tag, porque uma
+tag pode ser reescrita. O preço é credencial de publicação já no CI e uma
+política de limpeza no Artifact Registry, que acumula uma imagem por commit.
+
+Foi por isso que o job `imagem` já nasceu etiquetando com `${{ github.sha }}`:
+falta só a autenticação e o `push`.
+
 ### Autenticação: serviço aberto, protegido por limites
 
 Decisão do usuário, com as alternativas à vista:

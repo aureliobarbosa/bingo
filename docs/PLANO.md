@@ -21,7 +21,7 @@ hospedagem, servidor e armazenamento, conferido contra o código. Ele confirmou
 as decisões da Etapa 8 e acrescentou o arquivo de configuração e a semente; a
 conferência revelou os buracos de validação das etapas 6.2 e 6.3.
 
-## Etapa 8 — Integração contínua e publicação
+## Etapa 8 — Publicação
 
 ### Carga esperada, que sustenta as decisões abaixo
 
@@ -31,14 +31,6 @@ segundo. Os alunos **não acessam o serviço**: recebem papel impresso. Somado a
 que foi medido no container (47 MB de memória, 0,38 s para gerar 100 folhas), o
 dimensionamento é trivial: um único processo `uvicorn` atende com folga de várias
 ordens de grandeza.
-
-### 8.1 Integração contínua — **concluída**
-
-`.github/workflows/ci.yml` com três jobs paralelos (`testes`, `estatica`,
-`imagem`). O porquê da forma está em [DECISOES.md](DECISOES.md). O que a 8.2
-herda daqui: o job `imagem` já constrói o estágio `producao` e o valida com o
-`scripts/fumaca.sh`; falta dar-lhe credencial para **empurrar** a imagem, e ao
-deploy, promover pelo digest o artefato que passou por aqui.
 
 ### 8.2 Publicação no Google Cloud Run
 
@@ -62,11 +54,12 @@ proxy é aceitável porque o contêiner só recebe tráfego do Google Front End.
 **Publicação:** Workload Identity Federation no Actions, sem chave de conta de
 serviço no repositório; Artifact Registry; região `southamerica-east1`.
 
-**Construir uma vez e promover**, decidido na 8.1: o job `imagem` do CI ganha a
-autenticação e o `push` com a tag do SHA, e o deploy aponta o Cloud Run para o
-**digest** — não para a tag, que pode ser reescrita. Implanta-se o binário exato
-que passou nos testes, e o rollback vira apontar para o digest anterior. Pede
-uma política de limpeza no Artifact Registry.
+**Construir uma vez e promover**, decidido na 8.1: o job `imagem` do CI já
+constrói o estágio `producao`, etiqueta com o SHA e valida com o
+`scripts/fumaca.sh`. Falta dar-lhe autenticação e `push`, e fazer o deploy
+apontar o Cloud Run para o **digest** — não para a tag, que pode ser reescrita.
+Implanta-se o binário exato que passou nos testes, e o rollback vira apontar
+para o digest anterior. Pede uma política de limpeza no Artifact Registry.
 
 O `deploy.yml` é **um arquivo separado** do `ci.yml`, e por permissão, não por
 estética: ele precisa de `id-token: write` para o WIF, e num arquivo só essa
