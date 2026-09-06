@@ -15,7 +15,7 @@ decisão.
 
 ```bash
 uv sync                                    # cria o ambiente (baixa o Python 3.14)
-uv run pytest -q                           # 55 testes
+uv run pytest -q                           # 58 testes
 uv run uvicorn bingo.api:app --reload      # http://127.0.0.1:8000
 ```
 
@@ -94,6 +94,11 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   em 4 MB (413), logo em 2 MB conferidos pelo `max_length` do campo antes de o
   Pydantic materializar a string, e 50 caracteres por palavra — acima disso o
   texto não cabe na célula e encolhe a fonte da folha toda.
+- **Universo limitado a 100 elementos** (`MAX_ELEMENTOS` em `models.py`), valendo
+  igual para `numero_elementos` e para a quantidade de palavras — são o mesmo
+  conceito. Consequência aceita: como a validação exige universo *estritamente
+  maior* que os elementos por folha, uma grade de exatamente 100 células (10×10,
+  5×20, 20×5) ficou impossível; até 99 células segue valendo.
 - **Número de folhas limitado por C(n, k)**, o total de folhas distintas que o
   universo permite: `combinacoes_possiveis` e `maximo_folhas` em `models.py`. O
   JavaScript refaz a conta saturando o produto em `MAX_FOLHAS`, o que dispensa
@@ -124,8 +129,9 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   Etapa 8.
 - **As constantes de limite vivem em três lugares** e mudam juntas:
   `src/bingo/models.py` (a autoridade), a constante no topo de `static/app.js` e
-  o atributo do campo em `static/index.html`. Já vale para `MAX_FOLHAS` e
-  `MAX_PALAVRA_CARACTERES`, e valerá para `MAX_ELEMENTOS` na Etapa 6.3.
+  o atributo do campo em `static/index.html`. Vale para `MAX_ELEMENTOS`,
+  `MAX_CELULAS`, `MAX_FOLHAS` e `MAX_PALAVRA_CARACTERES`. O `api.py` importa de
+  `models.py`, então não conta como quarta cópia.
 - **Input de arquivo: limpar `value` depois de ler.** Sem isso, escolher o mesmo
   arquivo outra vez não dispara `change` e a interface parece morta — isso já
   custou uma sessão inteira de diagnóstico. E **não aninhe o `<input>` dentro do

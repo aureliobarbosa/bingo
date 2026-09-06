@@ -2,7 +2,7 @@
 
 import pytest
 
-from bingo.models import MAX_FOLHAS, ConfiguracaoJogo
+from bingo.models import MAX_ELEMENTOS, MAX_FOLHAS, ConfiguracaoJogo
 
 PALAVRAS = tuple(f"palavra{i}" for i in range(20))
 
@@ -146,3 +146,27 @@ def test_universo_grande_e_limitado_pelo_teto_do_servico():
     )
     assert cfg.combinacoes_possiveis == math.comb(75, 24)
     assert cfg.maximo_folhas == MAX_FOLHAS
+
+
+def test_universo_no_teto_e_aceito_nos_dois_tipos():
+    numeros = ConfiguracaoJogo(numero_elementos=MAX_ELEMENTOS, linhas=3, colunas=3)
+    palavras = ConfiguracaoJogo(
+        tipo="palavras",
+        palavras=tuple(f"p{i}" for i in range(MAX_ELEMENTOS)),
+        linhas=3,
+        colunas=3,
+    )
+    assert len(numeros.universo) == MAX_ELEMENTOS
+    assert len(palavras.universo) == MAX_ELEMENTOS
+
+
+def test_universo_acima_do_teto_e_rejeitado_nos_dois_tipos():
+    with pytest.raises(ValueError, match=f"entre 1 e {MAX_ELEMENTOS}"):
+        ConfiguracaoJogo(numero_elementos=MAX_ELEMENTOS + 1, linhas=3, colunas=3)
+    with pytest.raises(ValueError, match=f"passar de {MAX_ELEMENTOS} palavras"):
+        ConfiguracaoJogo(
+            tipo="palavras",
+            palavras=tuple(f"p{i}" for i in range(MAX_ELEMENTOS + 1)),
+            linhas=3,
+            colunas=3,
+        )

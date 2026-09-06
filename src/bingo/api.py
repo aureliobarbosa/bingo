@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from bingo.gerador import gerar_folha, gerar_jogo
 from bingo.models import (
+    MAX_ELEMENTOS,
     MAX_FOLHAS,
     MAX_LOGO_BYTES,
     MAX_PALAVRA_CARACTERES,
@@ -40,8 +41,8 @@ class ConfiguracaoIn(BaseModel):
     """Configuração recebida do frontend; espelha ConfiguracaoJogo."""
 
     tipo: TipoBingo = "numeros"
-    numero_elementos: int = Field(default=75, ge=1, le=10_000)
-    palavras: list[Palavra] = Field(default_factory=list)
+    numero_elementos: int = Field(default=75, ge=1, le=MAX_ELEMENTOS)
+    palavras: list[Palavra] = Field(default_factory=list, max_length=MAX_ELEMENTOS)
     linhas: int = Field(default=5, ge=1, le=20)
     colunas: int = Field(default=5, ge=1, le=20)
     numero_folhas: int = Field(default=10, ge=1, le=MAX_FOLHAS)

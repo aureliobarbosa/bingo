@@ -78,7 +78,9 @@ const CHAVE_TEMA = "bingo.tema";
 const LOGO_PADRAO = "logo.jpeg";
 const FORMATOS_LOGO = ["image/png", "image/jpeg"];
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
-const MAX_FOLHAS = 100; // precisa acompanhar MAX_FOLHAS em src/bingo/models.py
+const MAX_CELULAS = 100; // precisa acompanhar MAX_CELULAS em src/bingo/models.py
+const MAX_ELEMENTOS = 100; // idem, MAX_ELEMENTOS em models.py
+const MAX_FOLHAS = 100; // idem, MAX_FOLHAS em models.py
 const MAX_PALAVRA_CARACTERES = 50; // idem, MAX_PALAVRA_CARACTERES em models.py
 const ESPERA_LIBERAR_BLOB_MS = 60_000;
 
@@ -156,11 +158,17 @@ function validar(cfg) {
   if (cfg.linhas < 1 || cfg.colunas < 1) {
     return "A grade precisa ter ao menos uma linha e uma coluna.";
   }
-  if (celulas(cfg) > 100) {
-    return `A grade não pode passar de 100 células (pedido: ${cfg.linhas}x${cfg.colunas} = ${celulas(cfg)}).`;
+  if (celulas(cfg) > MAX_CELULAS) {
+    return `A grade não pode passar de ${MAX_CELULAS} células (pedido: ${cfg.linhas}x${cfg.colunas} = ${celulas(cfg)}).`;
   }
   if (cfg.numero_folhas < 1 || cfg.numero_folhas > MAX_FOLHAS) {
     return `O número de folhas deve estar entre 1 e ${MAX_FOLHAS}.`;
+  }
+  if (cfg.tipo === "numeros" && (cfg.numero_elementos < 1 || cfg.numero_elementos > MAX_ELEMENTOS)) {
+    return `O número de elementos deve estar entre 1 e ${MAX_ELEMENTOS}.`;
+  }
+  if (cfg.tipo === "palavras" && cfg.palavras.length > MAX_ELEMENTOS) {
+    return `A lista não pode passar de ${MAX_ELEMENTOS} palavras (recebidas: ${cfg.palavras.length}).`;
   }
   if (cfg.tipo === "palavras" && new Set(cfg.palavras).size !== cfg.palavras.length) {
     return "A lista de palavras não pode conter repetições.";

@@ -1,8 +1,8 @@
 # Bingo — o que falta fazer
 
-> **Andamento** — Etapas 0 a 7 concluídas, mais a 6.2 (limites de entrada).
-> Restam a 6.3 (teto do universo), a 8.1 (integração contínua), a 8.2 (Cloud
-> Run), a 8.3 (limite de taxa e cache), a 9 (arquivo de configuração) e a 10
+> **Andamento** — Etapas 0 a 7 concluídas, mais a 6.2 (limites de entrada) e a
+> 6.3 (teto do universo). Restam a 8.1 (integração contínua), a 8.2 (Cloud Run),
+> a 8.3 (limite de taxa e cache), a 9 (arquivo de configuração) e a 10
 > (documentação).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
@@ -14,53 +14,12 @@ resumo de uma linha por decisão está no [CLAUDE.md](../CLAUDE.md).
 Serviço *stateless* que gera cartelas de bingo em PDF para impressão: FastAPI e
 reportlab no backend, Bootstrap 5 com JavaScript sem build step no frontend. O
 devcontainer e a imagem de produção saem do mesmo `Dockerfile`, com base única
-nos três estágios. Os 55 testes passam. Falta publicar.
+nos três estágios. Os 58 testes passam. Falta publicar.
 
 **Origem das etapas 6.2 a 9:** um briefing produzido numa sessão paralela sobre
 hospedagem, servidor e armazenamento, conferido contra o código. Ele confirmou
 as decisões da Etapa 8 e acrescentou o arquivo de configuração e a semente; a
 conferência revelou os buracos de validação das etapas 6.2 e 6.3.
-
----
-
-## Etapa 6.3 — Universo máximo de 100 elementos
-
-`numero_elementos` é o **tamanho do universo**: em `models.py` o universo de tipo
-`numeros` é `1..numero_elementos`, e no `app.js` a função `disponiveis()` devolve
-`numero_elementos` para números e `palavras.length` para palavras. São o mesmo
-conceito e devem ter o mesmo teto.
-
-Hoje o teto é `le=10_000` em `api.py` e `max="10000"` em `index.html` — alto
-demais para um bingo impresso, e um vetor de consumo: `universo` materializa a
-tupla e `combinacoes_possiveis` roda `math.comb` sobre ela. E a quantidade de
-palavras não tem teto nenhum.
-
-**Uma constante só, `MAX_ELEMENTOS = 100`** em `models.py`, valendo para
-`numero_elementos` e para `len(palavras)`.
-
-Onde mexer — é o mesmo trio da armadilha do `MAX_FOLHAS`:
-
-- `src/bingo/models.py` — a constante e a regra em `validar()`
-- `src/bingo/api.py` — `le=MAX_ELEMENTOS` e `max_length` da lista de palavras
-- `static/app.js` — a constante e a checagem em `validar()`, que hoje **não tem
-  teto superior algum** para o universo
-- `static/index.html` — `max="100"` no campo
-
-Aproveitar para trocar o literal `100` do `app.js` por uma constante
-`MAX_CELULAS`, que é a mesma duplicação sem nome.
-
-**Consequência aceita:** a validação exige universo *estritamente maior* que os
-elementos por folha. Com o universo em 100 e `MAX_CELULAS` em 100, uma grade de
-exatamente 100 células (10×10, 5×20, 20×5 — todas de lados pares, portanto sem
-centro livre) passa a ser impossível, porque exigiria 101 elementos. Grades de
-até 99 células seguem funcionando. Decisão do usuário, tomada com a consequência
-à vista; se um dia o 10×10 fizer falta, o teto vira 101.
-
-Testes: teto aceito, teto + 1 recusado, nos dois tipos.
-
-Commit: `fix: limita o universo do bingo a 100 elementos`.
-
----
 
 ## Etapa 8 — Integração contínua e publicação
 

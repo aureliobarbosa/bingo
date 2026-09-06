@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
 from bingo.api import MAX_CORPO_BYTES, MAX_LOGO_CARACTERES, app
-from bingo.models import MAX_PALAVRA_CARACTERES
+from bingo.models import MAX_ELEMENTOS, MAX_PALAVRA_CARACTERES
 
 client = TestClient(app)
 
@@ -127,5 +127,21 @@ def test_logo_gigante_e_barrado_antes_de_abrir_a_imagem():
     r = client.post(
         "/api/preview",
         json={**CONFIG, "logo_enviado": "data:image/png;base64," + "A" * (MAX_LOGO_CARACTERES + 1)},
+    )
+    assert r.status_code == 422
+
+
+def test_universo_acima_do_teto_e_rejeitado_pelo_schema():
+    """O Pydantic barra antes de `universo` materializar a tupla."""
+    r = client.post("/api/preview", json={**CONFIG, "numero_elementos": MAX_ELEMENTOS + 1})
+    assert r.status_code == 422
+
+    r = client.post(
+        "/api/preview",
+        json={
+            **CONFIG,
+            "tipo": "palavras",
+            "palavras": [f"p{i}" for i in range(MAX_ELEMENTOS + 1)],
+        },
     )
     assert r.status_code == 422

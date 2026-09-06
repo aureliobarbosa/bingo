@@ -9,6 +9,11 @@ TipoBingo = Literal["numeros", "palavras"]
 MAX_CELULAS = 100
 MAX_FOLHAS = 100
 
+# Tamanho do universo sorteável: os números de 1 a `numero_elementos` ou a lista
+# de palavras. São o mesmo conceito e têm o mesmo teto — um bingo impresso não
+# precisa de mais, e `universo` e `combinacoes_possiveis` custam caro acima disso.
+MAX_ELEMENTOS = 100
+
 FORMATOS_LOGO = ("image/png", "image/jpeg")
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB: o data URI trafega a cada preview
 
@@ -112,9 +117,16 @@ class ConfiguracaoJogo:
             raise ValueError(f"O número de folhas deve estar entre 1 e {MAX_FOLHAS}.")
 
         if self.tipo == "numeros":
-            if self.numero_elementos < 1:
-                raise ValueError("O número de elementos deve ser ao menos 1.")
+            if not 1 <= self.numero_elementos <= MAX_ELEMENTOS:
+                raise ValueError(
+                    f"O número de elementos deve estar entre 1 e {MAX_ELEMENTOS}."
+                )
         else:
+            if len(self.palavras) > MAX_ELEMENTOS:
+                raise ValueError(
+                    f"A lista não pode passar de {MAX_ELEMENTOS} palavras "
+                    f"(recebidas: {len(self.palavras)})."
+                )
             if any(not p.strip() for p in self.palavras):
                 raise ValueError("A lista de palavras não pode conter linhas vazias.")
             if len(set(self.palavras)) != len(self.palavras):

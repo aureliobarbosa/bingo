@@ -452,6 +452,39 @@ mesma razão da quebra em duas linhas já registrada. Validado nos dois lados.
 O teto de *quantidade* de palavras não entrou aqui: é o tamanho do universo, e
 foi tratado junto com `numero_elementos` na 6.3.
 
+## Etapa 6.3 — Teto do universo — **concluída**
+
+`numero_elementos` é o **tamanho do universo sorteável**, o mesmo conceito que
+`len(palavras)`: em `models.py` o universo de tipo `numeros` é
+`1..numero_elementos` e o de palavras é a própria lista. Tinham tetos
+diferentes — `le=10_000` no schema para os números e nenhum para as palavras.
+
+**Uma constante só, `MAX_ELEMENTOS = 100` em `models.py`**, valendo para os
+dois. Dez mil era alto demais para um bingo impresso e era um vetor de consumo:
+`universo` materializa a tupla e `combinacoes_possiveis` roda `math.comb` sobre
+ela.
+
+| Entrada | Antes | Agora |
+|---|---|---|
+| `numero_elementos` | `le=10_000` no schema, `>= 1` em `models.py` | 1 a 100, nos dois |
+| Quantidade de palavras | sem limite | `max_length=100` no schema e regra em `models.py` |
+
+Alterado no mesmo trio da armadilha do `MAX_FOLHAS` — `models.py` (a
+autoridade), `api.py`, `static/app.js` e o `max` do campo em `index.html`. O
+`app.js` **não tinha teto superior algum** para o universo; agora tem, com a
+mesma mensagem do backend. O literal `100` da checagem de células virou
+`MAX_CELULAS`, que é a mesma duplicação sem nome.
+
+**Consequência aceita, decidida com ela à vista:** a validação exige universo
+*estritamente maior* que os elementos por folha. Com o universo em 100 e
+`MAX_CELULAS` em 100, uma grade de exatamente 100 células (10×10, 5×20, 20×5 —
+todas de lados pares, portanto sem centro livre) passa a ser impossível, porque
+exigiria 101 elementos. Grades de até 99 células seguem funcionando. Se um dia o
+10×10 fizer falta, o teto vira 101.
+
+Conferido caso a caso que as mensagens do `app.js` e as de `models.py` coincidem
+nos dois tipos, no teto, no teto + 1 e nas grades de 99, 100 e 121 células.
+
 ## Etapa 7 — Container — **concluída**
 
 `Dockerfile` com três estágios e um `.devcontainer/devcontainer.json` que aponta
