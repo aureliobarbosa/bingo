@@ -14,6 +14,12 @@ cada uma, inclusive as previsões que a execução depois corrigiu — a correç
 anotada no próprio item, que é o que dá para ler a decisão junto com o seu
 desfecho.
 
+A maior parte trata de código já escrito, mas nem tudo: a seção **Decisões de
+publicação** registra escolhas fechadas *antes* da execução das etapas 8 e 9.
+Elas estão aqui, e não no `PLANO.md`, porque o que se quer guardar é a
+alternativa descartada — e uma alternativa descartada no plano se parece com uma
+questão ainda em aberto.
+
 > **Duas linhas da tabela de enquadramento abaixo foram superadas** e ficam como
 > registro do ponto de partida, não do estado atual: o **logo** deixou de estar
 > fora do protótipo (etapas 6.1.1 a 6.1.3.v) e o **sorteio** deixou de ser
@@ -563,6 +569,98 @@ então quem volta à rede é o apt e o npm.
 
 Commit: `chore: unifica a base das imagens e fixa a versão do uv`.
 
+
+## Decisões de publicação — tomadas antes da execução
+
+Fechadas em 2026-09-06, a partir de um briefing produzido numa sessão paralela e
+conferido contra o código. As etapas 8 e 9 ainda não foram executadas, mas as
+escolhas já estão feitas: ficam aqui para não serem reabertas como se fossem
+questões em aberto no `PLANO.md`.
+
+### Hospedagem: Google Cloud Run
+
+| Opção | Por que não |
+|---|---|
+| Hugging Face Spaces | Sem cartão e o mais fácil de publicar, mas lido como vitrine de demonstração; perde valor como peça de portfólio |
+| Render | Dorme em ~15 min e acorda em dezenas de segundos — péssimo para quem abre o link uma vez por mês |
+| Azure Container Apps | Equivalente ao Cloud Run, sem vantagem que justifique a troca |
+| Fly.io | Modelo gratuito mudou ao longo dos anos; incerto |
+| Oracle Always Free | Sempre ligada, mas exige administrar TLS, firewall e atualizações |
+
+Pesou também um critério não técnico: o projeto serve de **portfólio**, e o Cloud
+Run comunica competência de operação que uma plataforma de demonstração não
+comunica. O diferencial, porém, não é a plataforma e sim o que existe em volta —
+CI, salvaguardas de custo e o registro das decisões.
+
+### Servidor: uvicorn sozinho, um único worker
+
+A objeção habitual de "não exponha uvicorn direto à internet" **não se aplica no
+Cloud Run**: o Google Front End fica na frente do contêiner e faz o que o nginx
+faria — termina o TLS, trata HTTP/1.1 e HTTP/2, normaliza e bufferiza as
+requisições, absorve ataque de cliente lento e aplica limites. O contêiner só
+recebe HTTP simples de um proxy confiável. É por isso que **nginx está
+descartado**: ele não substitui o uvicorn (não executa Python), seria um proxy a
+mais na frente dele, e só voltaria a fazer sentido numa VPS administrada por nós.
+
+| Alternativa | Por que não |
+|---|---|
+| Gunicorn + UvicornWorker | Supervisão redundante: o Cloud Run já reinicia contêiner não saudável. Custa um processo e ~30-50 MB |
+| Hypercorn | Só compensa pela cobertura de protocolos (HTTP/3, Trio); mais lento e comunidade menor |
+| Granian | Bom desempenho e menos memória, mas projeto jovem e ecossistema menor |
+| Daphne | Mais lento; sem motivo fora de Django Channels |
+| Waitress / uWSGI | Só fazem sentido em WSGI; o uWSGI está em modo manutenção |
+
+**Um worker só**, porque o Cloud Run escala criando instâncias, não fazendo fork
+de workers: vários apenas multiplicariam a memória por instância. No volume
+previsto — cerca de uma requisição por hora — o servidor é irrelevante para
+desempenho.
+
+### Sem banco de dados, e sem estado no servidor
+
+O sistema de arquivos do contêiner no Cloud Run é **tmpfs**: o que se escreve
+conta como memória da instância e desaparece quando ela é reciclada — o que
+acontece após ~15 min de ociosidade, a cada deploy e a critério do Google. Uma
+segunda instância nasce com uma cópia vazia. **SQLite dentro do contêiner perde
+dados silenciosamente.**
+
+Montar um bucket por Cloud Storage FUSE foi avaliado e **corrompe SQLite**: o
+FUSE não oferece lock de arquivo para escrita concorrente, o último a escrever
+vence, e não é um sistema de arquivos POSIX completo — e o SQLite depende de
+locks POSIX.
+
+Alternativas viáveis, caso um dia houvesse estado no servidor: SQLite +
+Litestream com `max-instances=1`, Firestore (cabe na camada gratuita neste
+volume), Cloud SQL Postgres (~US$ 10 a 25/mês) ou Postgres gerenciado externo.
+**Nenhuma é necessária**, e a ausência de estado tem um efeito que vale tanto
+quanto funcionalidade: não há dado pessoal no servidor, nada para vazar, nada
+para fazer backup e nenhuma exposição à LGPD.
+
+### Estado no computador do professor: arquivo, não cookie
+
+**Cookies descartados:** 4 KB por cookie, e trafegam em toda requisição. Uma
+lista de palavras mais um logo estoura isso de imediato.
+
+O arquivo JSON exportável (Etapa 9) vence o `localStorage` em durabilidade —
+sobrevive a limpeza de navegador, troca de máquina e reimagem de laboratório
+pela TI da escola — e em compartilhamento: o professor manda a configuração por
+e-mail para um colega, o que vira um recurso sem custo de código. A desvantagem
+é ser manual, e alguém vai perder um arquivo. O `localStorage` **continua** como
+conveniência; o arquivo é o caminho durável.
+
+### Autenticação: serviço aberto, protegido por limites
+
+Decisão do usuário, com as alternativas à vista:
+
+| Opção | Por que não |
+|---|---|
+| Senha compartilhada | Os professores usam o sistema 4 a 6 vezes por ano e vão esquecê-la — gerando exatamente o chamado de suporte que se quer evitar |
+| IAM do Cloud Run | Exige conta Google por professor e um proxy autenticador (IAP) para funcionar no navegador; muito setup para "publicar e não mexer por um ano" |
+
+A proteção vem então de limites, não de identidade: teto do corpo da requisição
+(6.2), teto do universo (6.3), limite de taxa por IP (8.3), `--max-instances 3`
+e alerta de orçamento (8.2). **O teto de instâncias é o que limita a exposição
+financeira**, que é o risco real de deixar o serviço no ar e esquecê-lo — mais
+do que o abuso em si.
 
 ---
 
