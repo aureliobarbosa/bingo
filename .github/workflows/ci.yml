@@ -1,0 +1,107 @@
+# Integração contínua: roda antes de qualquer publicação e é o que dá o sinal
+# verde para o deploy (Etapa 8.2). Os três jobs são independentes e correm em
+# paralelo — um lint quebrado e um teste quebrado se distinguem de relance.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Só leitura: este workflow executa código de pull request. As credenciais de
+# publicação ficam no workflow de deploy, que não roda em PR.
+permissions:
+  contents: read
+
+# Dois pushes seguidos não pagam duas execuções completas.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # A mesma versão do ARG UV_VERSION do Dockerfile: o CI e a imagem resolvem
+  # dependências com a mesma ferramenta.
+  UV_VERSION: "0.9.30"
+
+jobs:
+  testes:
+    name: Testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      # Falha se o uv.lock não corresponde ao pyproject.toml. Automatiza a
+      # convenção de commitar o lock junto — o que garante o mesmo ambiente
+      # entre o laptop, o desktop e a imagem de produção.
+      - name: O uv.lock está em dia
+        run: uv lock --check
+
+      - run: uv sync --frozen
+
+      - run: uv run pytest -q
+
+  estatica:
+    name: Análise estática
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v10
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      - name: Ruff — regras
+        run: uv run ruff check .
+
+      - name: Ruff — formatação
+        run: uv run ruff format --check .
+
+      # O frontend não tem testes: um erro de sintaxe no app.js só apareceria
+      # ao abrir a página com o cache limpo. O node já vem no runner.
+      - name: Sintaxe do JavaScript
+        run: node --check static/app.js
+
+  imagem:
+    name: Imagem de produção
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Construída aqui e carregada localmente. Na Etapa 8.2 esta mesma etapa
+      # ganha autenticação e `push`, e o deploy passa a promover pelo digest o
+      # artefato que foi testado aqui — em vez de reconstruir outro.
+      - name: Construir o estágio de produção
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: producao
+          load: true
+          tags: bingo:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Subir o container
+        run: |
+          docker run --detach --name bingo --publish 8000:8000 \
+            bingo:${{ github.sha }}
+
+      - name: Teste de fumaça
+        run: ./scripts/fumaca.sh http://127.0.0.1:8000
+
+      # Sem isto, uma falha acima aparece só como "exit 1" sem o traceback.
+      - name: Registro do container, se algo falhar
+        if: failure()
+        run: docker logs bingo

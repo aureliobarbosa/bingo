@@ -603,6 +603,76 @@ então quem volta à rede é o apt e o npm.
 Commit: `chore: unifica a base das imagens e fixa a versão do uv`.
 
 
+## Etapa 8.1 — Integração contínua — **concluída**
+
+### Dois workflows, e o motivo é permissão
+
+`ci.yml` e, depois, `deploy.yml` — separados porque o deploy precisa de
+`id-token: write` para o Workload Identity Federation. Num arquivo só, a
+permissão mais alta alcançaria os jobs que executam código de pull request. O
+`ci.yml` roda com `contents: read` e nada mais. A separação também mantém o CI
+verde ou vermelho independente de uma falha de infraestrutura do deploy.
+
+### Três jobs paralelos
+
+| Job | O que cobre |
+|---|---|
+| `testes` | `uv lock --check`, `uv sync --frozen`, `uv run pytest -q` |
+| `estatica` | `ruff check`, `ruff format --check`, `node --check static/app.js` |
+| `imagem` | constrói o estágio `producao`, sobe o container e roda o teste de fumaça |
+
+Independentes e em paralelo: um lint quebrado e um teste quebrado se distinguem
+de relance, sem ler registro.
+
+**Sem matriz de versões do Python.** O `requires-python` é `>=3.14` e a imagem é
+`python:3.14-slim-bookworm`. Testar em 3.12 validaria um ambiente que nunca vai
+existir.
+
+**O `uv lock --check` automatiza uma convenção humana.** O trabalho acontece em
+duas máquinas, e a regra "quem alterar dependências commita o `uv.lock` junto"
+dependia de lembrar. Agora falha o CI.
+
+**O `node --check static/app.js`** é a única verificação automática que o
+frontend tem. Um erro de sintaxe no `app.js` hoje só apareceria ao abrir a
+página com o cache limpo — e o cache dos estáticos é uma armadilha já conhecida.
+
+### Construir não prova que funciona: o teste de fumaça
+
+O plano previa só construir a imagem sem publicar. Isso não teria pego nenhuma
+das armadilhas já registradas — `RAIZ_PROJETO` calculada a partir do
+arquivo-fonte, `static/` que não viaja num wheel, venv não-relocável entre
+bases. **Todas passam pelo build e quebram na primeira requisição.**
+
+Por isso o job sobe o container e roda `scripts/fumaca.sh`, que confere a página
+inicial, os dois estáticos (`app.js` e o logo), o `POST /api/preview` e o
+`POST /api/jogo`. As duas últimas usam centro livre, então também provam que o
+logo padrão chegou na imagem e que o reportlab consegue abri-lo.
+
+O script mora em `scripts/`, e não embutido no YAML, para poder rodar localmente
+contra um `uvicorn`: foi assim que ele foi validado, inclusive no caminho de
+falha, num ambiente sem Docker. Na Etapa 8.2 ele valida de graça a mudança do
+`PORT` no `CMD`.
+
+### Ruff, e a formatação que veio junto
+
+Não havia linter. O `charliermarsh.ruff` já estava declarado no
+`devcontainer.json`, mas o binário nunca fora instalado — a extensão apontava
+para o vazio. Entrou como dependência de desenvolvimento, com
+`select = ["E", "F", "I"]`: erros de sintaxe e de fluxo, mais imports ordenados.
+Nada de estilo além do que o `ruff format` já resolve.
+
+Custou um passe de formatação em 6 arquivos e 8 correções (7 linhas longas e um
+import não usado nos testes). O `ruff.path` no devcontainer aponta para
+`/opt/venv/bin/ruff`, para que o editor use a mesma versão do `uv.lock` e do CI,
+e não a que a extensão embute.
+
+### Versões das actions, confirmadas na escrita
+
+`actions/checkout@v7`, `astral-sh/setup-uv@v10`, `docker/setup-buildx-action@v4`
+e `docker/build-push-action@v7`. A versão do uv fica em `env.UV_VERSION`,
+espelhando o `ARG UV_VERSION` do `Dockerfile` — as duas mudam juntas, senão o CI
+resolve dependências com uma ferramenta diferente da que constrói a imagem.
+
 ## Decisões de publicação — tomadas antes da execução
 
 Fechadas em 2026-09-06, a partir de um briefing produzido numa sessão paralela e

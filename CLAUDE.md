@@ -16,7 +16,9 @@ decisão.
 ```bash
 uv sync                                    # cria o ambiente (baixa o Python 3.14)
 uv run pytest -q                           # 58 testes
+uv run ruff check . && uv run ruff format --check .   # o que o CI cobra
 uv run uvicorn bingo.api:app --reload      # http://127.0.0.1:8000
+scripts/fumaca.sh http://127.0.0.1:8000    # o serviço responde de verdade
 ```
 
 Em container (mesma receita para os dois ambientes):
@@ -31,6 +33,10 @@ O `.devcontainer/` aponta para o estágio `desenvolvimento` do mesmo `Dockerfile
 O backend de build é o **`uv_build`**, embutido no próprio `uv`. O bloco
 `[build-system]` existe porque o layout `src/` precisa dele para o projeto ser
 instalado no ambiente (em modo editável) — **não** para publicar nada no PyPI.
+
+O CI (`.github/workflows/ci.yml`) roda esses mesmos comandos em três jobs
+paralelos — `testes`, `estatica` e `imagem` — e o último constrói o estágio
+`producao`, sobe o container e roda o `scripts/fumaca.sh` contra ele.
 
 ## Convenções de trabalho
 
@@ -127,6 +133,15 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   conferir uma mudança na interface, recarregue ignorando o cache
   (`Ctrl+Shift+R`) ou use uma janela anônima. A correção definitiva é decisão da
   Etapa 8.
+- **A versão do uv vive em dois lugares**: o `ARG UV_VERSION` do `Dockerfile` e
+  o `env.UV_VERSION` de `.github/workflows/ci.yml`. Elas devem andar juntas,
+  senão o CI resolve dependências com uma ferramenta diferente da que constrói
+  a imagem.
+- **Construir a imagem não prova que ela funciona.** As armadilhas do
+  `RAIZ_PROJETO`, do `static/` e do venv não-relocável passam pelo build e só
+  quebram na primeira requisição. Por isso o job `imagem` sobe o container e
+  roda o `scripts/fumaca.sh` — que também serve localmente, contra um
+  `uvicorn`.
 - **As constantes de limite vivem em três lugares** e mudam juntas:
   `src/bingo/models.py` (a autoridade), a constante no topo de `static/app.js` e
   o atributo do campo em `static/index.html`. Vale para `MAX_ELEMENTOS`,

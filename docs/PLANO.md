@@ -1,8 +1,8 @@
 # Bingo — o que falta fazer
 
-> **Andamento** — Etapas 0 a 7 concluídas, mais a 6.2 (limites de entrada) e a
-> 6.3 (teto do universo). Restam a 8.1 (integração contínua), a 8.2 (Cloud Run),
-> a 8.3 (limite de taxa e cache), a 9 (arquivo de configuração) e a 10
+> **Andamento** — Etapas 0 a 7 concluídas, mais a 6.2 (limites de entrada), a
+> 6.3 (teto do universo) e a 8.1 (integração contínua). Restam a 8.2 (Cloud
+> Run), a 8.3 (limite de taxa e cache), a 9 (arquivo de configuração) e a 10
 > (documentação).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
@@ -32,19 +32,13 @@ que foi medido no container (47 MB de memória, 0,38 s para gerar 100 folhas), o
 dimensionamento é trivial: um único processo `uvicorn` atende com folga de várias
 ordens de grandeza.
 
-### 8.1 Integração contínua — **fazer antes do deploy**
+### 8.1 Integração contínua — **concluída**
 
-`.github/workflows/ci.yml`, disparado em push para `main` e em pull requests:
-
-- **testes** — `astral-sh/setup-uv` com cache, `uv sync --frozen`,
-  `uv run pytest -q`;
-- **imagem** — constrói o estágio `producao` do `Dockerfile` sem publicar, com
-  cache de camadas do próprio Actions, para que uma quebra no container apareça
-  aqui e não no meio da configuração do Cloud Run.
-
-Confirmar as versões correntes das actions antes de escrever o arquivo.
-
-Commit: `chore: integração contínua no GitHub Actions`.
+`.github/workflows/ci.yml` com três jobs paralelos (`testes`, `estatica`,
+`imagem`). O porquê da forma está em [DECISOES.md](DECISOES.md). O que a 8.2
+herda daqui: o job `imagem` já constrói o estágio `producao` e o valida com o
+`scripts/fumaca.sh`; falta dar-lhe credencial para **empurrar** a imagem, e ao
+deploy, promover pelo digest o artefato que passou por aqui.
 
 ### 8.2 Publicação no Google Cloud Run
 
@@ -67,6 +61,16 @@ proxy é aceitável porque o contêiner só recebe tráfego do Google Front End.
 
 **Publicação:** Workload Identity Federation no Actions, sem chave de conta de
 serviço no repositório; Artifact Registry; região `southamerica-east1`.
+
+**Construir uma vez e promover**, decidido na 8.1: o job `imagem` do CI ganha a
+autenticação e o `push` com a tag do SHA, e o deploy aponta o Cloud Run para o
+**digest** — não para a tag, que pode ser reescrita. Implanta-se o binário exato
+que passou nos testes, e o rollback vira apontar para o digest anterior. Pede
+uma política de limpeza no Artifact Registry.
+
+O `deploy.yml` é **um arquivo separado** do `ci.yml`, e por permissão, não por
+estética: ele precisa de `id-token: write` para o WIF, e num arquivo só essa
+permissão alcançaria os jobs que executam código de pull request.
 
 **Salvaguardas**, dimensionadas pelo que foi medido: `--memory 256Mi`,
 `--cpu 1`, `--min-instances 0`, `--max-instances 3`, timeout de requisição e
