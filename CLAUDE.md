@@ -5,8 +5,11 @@ define os parâmetros num painel lateral e vê a primeira folha como ela sairá 
 impressora. Backend Python + FastAPI + reportlab; frontend Bootstrap 5 e
 JavaScript sem build step.
 
-O plano completo, com as etapas já feitas e as pendentes, está em
-[docs/PLANO.md](docs/PLANO.md). **Leia-o antes de começar qualquer etapa nova.**
+O que falta fazer está em [docs/PLANO.md](docs/PLANO.md). **Leia-o antes de
+começar qualquer etapa nova.** O porquê de cada escolha já tomada está em
+[docs/DECISOES.md](docs/DECISOES.md): consulte-o ao mexer numa área pronta, sem
+precisar lê-lo inteiro. As seções abaixo são o resumo dele — uma linha por
+decisão.
 
 ## Como rodar
 
@@ -126,7 +129,7 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
 - **`restaurar()` (em `static/app.js`) não pode lançar.** Se lançar, a
   inicialização morre no meio — sem preview, sem eventos ligados e sem saída pela
   interface, já que não existe botão de restaurar padrões (dispensado no item
-  6.1.4 do plano, com o motivo registrado lá).
+  6.1.4 de `docs/DECISOES.md`, com o motivo registrado lá).
 - **Chrome headless não renderiza PDF** dentro de `iframe`; o `iframe` aparece
   preto nos screenshots mesmo com tudo funcionando. Verifique pelo DOM
   (`preview.src` começa com `blob:`). **Firefox headless não roda neste ambiente**
