@@ -4,16 +4,34 @@ O serviço é stateless: cada requisição traz a configuração completa do jog
 e recebe de volta um PDF.
 """
 
+from typing import Annotated
+
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from bingo.gerador import gerar_folha, gerar_jogo
-from bingo.models import MAX_FOLHAS, ConfiguracaoJogo, TipoBingo
+from bingo.models import (
+    MAX_FOLHAS,
+    MAX_LOGO_BYTES,
+    MAX_PALAVRA_CARACTERES,
+    ConfiguracaoJogo,
+    TipoBingo,
+)
 from bingo.pdf import RAIZ_PROJETO, gerar_pdf_folha, gerar_pdf_jogo
 
 STATIC = RAIZ_PROJETO / "static"
+
+# Teto do corpo da requisição. O pior caso legítimo é um logo de 2 MB, que vira
+# ~2,8 MB em base64, mais as palavras e o cabeçalho — 4 MB deixa folga. Sem este
+# limite o corpo inteiro é lido na memória antes de qualquer validação.
+MAX_CORPO_BYTES = 4 * 1024 * 1024
+
+# base64 gasta 4 caracteres a cada 3 bytes; a folga cobre o cabeçalho do data URI.
+MAX_LOGO_CARACTERES = MAX_LOGO_BYTES * 4 // 3 + 100
+
+Palavra = Annotated[str, StringConstraints(max_length=MAX_PALAVRA_CARACTERES)]
 
 app = FastAPI(title="Bingo", description="Gerador de cartelas de bingo para impressão")
 
@@ -23,12 +41,12 @@ class ConfiguracaoIn(BaseModel):
 
     tipo: TipoBingo = "numeros"
     numero_elementos: int = Field(default=75, ge=1, le=10_000)
-    palavras: list[str] = Field(default_factory=list)
+    palavras: list[Palavra] = Field(default_factory=list)
     linhas: int = Field(default=5, ge=1, le=20)
     colunas: int = Field(default=5, ge=1, le=20)
     numero_folhas: int = Field(default=10, ge=1, le=MAX_FOLHAS)
     centro_livre: bool = True
-    logo_enviado: str = ""
+    logo_enviado: str = Field(default="", max_length=MAX_LOGO_CARACTERES)
     titulo: str = Field(default="BINGO", max_length=80)
     subtitulo: str = Field(default="", max_length=120)
 
@@ -46,6 +64,31 @@ class ConfiguracaoIn(BaseModel):
             titulo=self.titulo.strip(),
             subtitulo=self.subtitulo.strip(),
         )
+
+
+@app.middleware("http")
+async def limitar_tamanho_do_corpo(request: Request, call_next):
+    """Recusa corpos grandes antes de lê-los.
+
+    A checagem é no `Content-Length`, que é o que todo cliente honesto manda.
+    Uma requisição em `chunked`, sem esse cabeçalho, escapa daqui — mas segue
+    limitada pelos tetos de cada campo e pelo limite da própria plataforma.
+    """
+    declarado = request.headers.get("content-length")
+    if declarado is not None:
+        try:
+            tamanho = int(declarado)
+        except ValueError:
+            return JSONResponse(
+                status_code=400, content={"detail": "Cabeçalho Content-Length inválido."}
+            )
+        if tamanho > MAX_CORPO_BYTES:
+            limite = MAX_CORPO_BYTES // (1024 * 1024)
+            return JSONResponse(
+                status_code=413,
+                content={"detail": f"A requisição passa do limite de {limite} MB."},
+            )
+    return await call_next(request)
 
 
 @app.exception_handler(ValueError)

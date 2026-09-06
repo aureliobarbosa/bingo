@@ -79,6 +79,7 @@ const LOGO_PADRAO = "logo.jpeg";
 const FORMATOS_LOGO = ["image/png", "image/jpeg"];
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 const MAX_FOLHAS = 100; // precisa acompanhar MAX_FOLHAS em src/bingo/models.py
+const MAX_PALAVRA_CARACTERES = 50; // idem, MAX_PALAVRA_CARACTERES em models.py
 
 /* Imagem enviada pelo usuário. Fica só em memória: um data URI de alguns MB
  * estouraria a cota do localStorage e derrubaria o resto da configuração. */
@@ -162,6 +163,12 @@ function validar(cfg) {
   }
   if (cfg.tipo === "palavras" && new Set(cfg.palavras).size !== cfg.palavras.length) {
     return "A lista de palavras não pode conter repetições.";
+  }
+  if (cfg.tipo === "palavras") {
+    const longa = cfg.palavras.find((p) => p.length > MAX_PALAVRA_CARACTERES);
+    if (longa !== undefined) {
+      return `Cada palavra pode ter no máximo ${MAX_PALAVRA_CARACTERES} caracteres ("${longa.slice(0, 20)}…" tem ${longa.length}).`;
+    }
   }
   if (disponiveis(cfg) <= elementosPorFolha(cfg)) {
     const limite = disponiveis(cfg) - 1 + (cfg.centro_livre ? 1 : 0);

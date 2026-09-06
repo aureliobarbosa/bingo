@@ -12,6 +12,10 @@ MAX_FOLHAS = 100
 FORMATOS_LOGO = ("image/png", "image/jpeg")
 MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB: o data URI trafega a cada preview
 
+# Uma palavra precisa caber numa célula impressa; acima disso a fonte da folha
+# inteira encolhe por causa de um texto só.
+MAX_PALAVRA_CARACTERES = 50
+
 
 @dataclass(frozen=True)
 class ConfiguracaoJogo:

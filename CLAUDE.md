@@ -8,7 +8,7 @@ JavaScript sem build step.
 O que falta fazer está em [docs/PLANO.md](docs/PLANO.md). **Leia-o antes de
 começar qualquer etapa nova.** O porquê de cada escolha já tomada está em
 [docs/DECISOES.md](docs/DECISOES.md): consulte-o ao mexer numa área pronta, sem
-precisar lê-lo inteiro. As seções abaixo são o resumo dele — uma linha por
+precisar lê-lo inteiro (use grep ou sed). As seções abaixo são o resumo dele — uma linha por
 decisão.
 
 ## Como rodar

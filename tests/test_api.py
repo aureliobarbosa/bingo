@@ -5,7 +5,8 @@ import io
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
-from bingo.api import app
+from bingo.api import MAX_CORPO_BYTES, MAX_LOGO_CARACTERES, app
+from bingo.models import MAX_PALAVRA_CARACTERES
 
 client = TestClient(app)
 
@@ -89,3 +90,42 @@ def test_folhas_acima_das_combinacoes_vira_422():
     )
     assert r.status_code == 422
     assert "apenas 9 folhas distintas" in r.json()["detail"]
+
+
+def test_corpo_acima_do_limite_vira_413():
+    # Content-Length declarado acima do teto: a rota nem chega a ser executada.
+    corpo = b'{"tipo":"numeros"}'
+    r = client.post(
+        "/api/preview",
+        content=corpo,
+        headers={
+            "content-type": "application/json",
+            "content-length": str(MAX_CORPO_BYTES + 1),
+        },
+    )
+    assert r.status_code == 413
+    assert "limite de 4 MB" in r.json()["detail"]
+
+
+def test_palavra_longa_demais_e_rejeitada_pelo_schema():
+    r = client.post(
+        "/api/preview",
+        json={
+            "tipo": "palavras",
+            "palavras": ["x" * (MAX_PALAVRA_CARACTERES + 1), "b", "c", "d", "e"],
+            "linhas": 2,
+            "colunas": 2,
+            "centro_livre": False,
+        },
+    )
+    assert r.status_code == 422
+
+
+def test_logo_gigante_e_barrado_antes_de_abrir_a_imagem():
+    # Passa do teto de caracteres do campo, então o Pydantic recusa sem que
+    # models.py precise contar os bytes do base64.
+    r = client.post(
+        "/api/preview",
+        json={**CONFIG, "logo_enviado": "data:image/png;base64," + "A" * (MAX_LOGO_CARACTERES + 1)},
+    )
+    assert r.status_code == 422
