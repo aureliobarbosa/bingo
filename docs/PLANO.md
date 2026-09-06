@@ -425,6 +425,42 @@ código montado; em produção o container serve `/`, `/static/images/logo.jpeg`
 gera um PDF de 5 páginas com o logo na célula central; o healthcheck reporta
 `healthy`.
 
+### 7.1 Ferramentas de trabalho dentro do devcontainer — **concluída**
+
+Duas faltas percebidas ao usar o container no dia a dia, ambas de ambiente, sem
+efeito sobre produção:
+
+- **`git` não existia no container.** A imagem base do `uv` não o traz e o
+  `Dockerfile` instalava apenas `ca-certificates`, `curl`, `gnupg` e `nodejs`.
+  O `.git/` chegava pelo *bind mount* de `/app`, mas não havia binário para
+  lê-lo: `git: command not found` no terminal. Resolvido acrescentando `git` ao
+  `apt-get install` do estágio `desenvolvimento`.
+- **A extensão do Claude Code não era instalada.** Extensões do host não são
+  herdadas pelo devcontainer; precisam estar declaradas em
+  `customizations.vscode.extensions`. Acrescentado `anthropic.claude-code` à
+  lista, ao lado de `ms-python.python` e `charliermarsh.ruff`.
+
+Junto veio o **mount do `~/.gitconfig`** (`/root/.gitconfig`), no mesmo padrão
+dos mounts de `~/.claude` — sem ele o git dentro do container fica sem
+`user.name`/`user.email` e todo commit falha. A escolha do mount em vez de
+configurar a identidade dentro do container só é segura porque **há um único
+desenvolvedor**: se o arquivo não existir no host, o Docker cria um diretório
+vazio no lugar e o git passa a reclamar.
+
+Como o `git` vem de uma camada nova da imagem, as mudanças exigem **Rebuild
+Container** — reabrir não basta.
+
+**`safe.directory` — decidido aguardar o problema ocorrer.** O `/app` chega por
+*bind mount*; quando o dono dos arquivos no host tem UID diferente do `root` do
+container, o git recusa a operação com *"detected dubious ownership in repository
+at '/app'"*. A correção é uma linha (`git config --global --add safe.directory
+/app`, no `postCreateCommand`), mas ela **não foi aplicada preventivamente**: o
+sintoma pode simplesmente não aparecer nesta combinação de host e container, e
+adicionar a exceção antes de precisar dela desliga uma proteção sem evidência de
+que faça falta. Fica registrado aqui para não custar diagnóstico se surgir.
+
+Commit: `chore: instala git e a extensão do Claude no devcontainer`.
+
 ## Etapa 8 — Integração contínua e publicação
 
 ### Carga esperada, que sustenta as decisões abaixo
