@@ -170,3 +170,14 @@ um `<script>` extra ao final, que dirige o formulário e imprime o resultado num
 `<pre>`; depois ler com `google-chrome --headless --dump-dom`. Apagar os arquivos
 temporários em seguida. Para conferir o PDF impresso, `pdftoppm -png` e ler a
 imagem.
+
+**O Chrome nem sempre está instalado** — não estava no ambiente da Etapa 6.3.
+Confirme antes (`which google-chrome chromium`) em vez de concluir que a página
+quebrou. Sem ele, para checar a *lógica* de validação basta o Node: avaliar
+`static/app.js` com `vm.runInContext` num contexto que traz um `document`
+mínimo (`getElementById` devolvendo um objeto com `value`, `textContent`,
+`hidden`, `addEventListener` e afins, mais `querySelector`, `localStorage`,
+`fetch` e `URL`), e então chamar `validar(cfg)` direto. Não substitui o
+navegador para layout ou eventos, mas prova que frontend e `models.py` dão a
+mesma mensagem para a mesma configuração. A chamada final a `atualizarPreview()`
+rejeita sozinha nesse contexto — é ruído esperado, não falha do teste.
