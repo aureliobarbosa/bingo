@@ -6,7 +6,6 @@ from pypdf import PdfReader
 
 from bingo.gerador import gerar_folha, gerar_jogo
 from bingo.models import ConfiguracaoJogo
-
 from bingo.pdf import dividir_texto, gerar_pdf_folha, gerar_pdf_jogo
 
 PALAVRAS = tuple(f"palavra{i}" for i in range(20))
@@ -31,8 +30,13 @@ def test_pdf_do_jogo_tem_uma_pagina_por_folha():
 
 def test_celulas_e_cabecalho_aparecem_no_texto_da_pagina():
     cfg = ConfiguracaoJogo(
-        tipo="palavras", palavras=PALAVRAS, linhas=3, colunas=3,
-        centro_livre=False, titulo="Bingo da Escola", subtitulo="Turma A",
+        tipo="palavras",
+        palavras=PALAVRAS,
+        linhas=3,
+        colunas=3,
+        centro_livre=False,
+        titulo="Bingo da Escola",
+        subtitulo="Turma A",
     )
     folha = gerar_folha(cfg)
     texto = _paginas(gerar_pdf_folha(folha, cfg))[0].extract_text()
@@ -64,7 +68,9 @@ def test_celula_quebrada_aparece_inteira_no_pdf():
     cfg = ConfiguracaoJogo(
         tipo="palavras",
         palavras=("Os Paralamas do Sucesso",) + tuple(f"artista{i}" for i in range(9)),
-        linhas=3, colunas=3, centro_livre=False,
+        linhas=3,
+        colunas=3,
+        centro_livre=False,
     )
     folha = gerar_folha(cfg)
     texto = _paginas(gerar_pdf_folha(folha, cfg))[0].extract_text()
@@ -76,10 +82,11 @@ def test_celula_quebrada_aparece_inteira_no_pdf():
 def test_quebrar_em_duas_linhas_aumenta_a_fonte():
     """Nomes longos com espaço devem sair maiores do que sairiam em linha única."""
     import io
+
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas as reportlab_canvas
 
-    from bingo.pdf import FONTE_CELULA, _linhas_das_celulas, _tamanho_fonte_celula
+    from bingo.pdf import _linhas_das_celulas, _tamanho_fonte_celula
 
     c = reportlab_canvas.Canvas(io.BytesIO(), pagesize=A4)
     nomes = ("Os Paralamas do Sucesso", "Buena Vista Social Club", "Queen")
@@ -174,7 +181,9 @@ def test_logo_enviado_ilegivel_vira_erro_em_portugues():
     import pytest
 
     cfg = ConfiguracaoJogo(
-        linhas=5, colunas=5, centro_livre=True,
+        linhas=5,
+        colunas=5,
+        centro_livre=True,
         logo_enviado="data:image/png;base64,bm9uc2Vuc2U=",
     )
     with pytest.raises(ValueError, match="ler a imagem enviada"):

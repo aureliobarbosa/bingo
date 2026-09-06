@@ -40,8 +40,12 @@ def test_sem_centro_livre_nenhuma_celula_e_vazia():
 
 def test_bingo_de_palavras():
     cfg = ConfiguracaoJogo(
-        tipo="palavras", palavras=PALAVRAS, linhas=3, colunas=3,
-        centro_livre=True, numero_folhas=4,
+        tipo="palavras",
+        palavras=PALAVRAS,
+        linhas=3,
+        colunas=3,
+        centro_livre=True,
+        numero_folhas=4,
     )
     folhas = gerar_jogo(cfg)
     assert len(folhas) == 4
@@ -53,8 +57,12 @@ def test_bingo_de_palavras():
 def test_jogo_nao_repete_folhas_mesmo_com_universo_apertado():
     """Com 9 palavras numa grade 3x3 só existem 9 folhas: todas devem sair uma vez."""
     cfg = ConfiguracaoJogo(
-        tipo="palavras", palavras=tuple(f"p{i}" for i in range(9)),
-        linhas=3, colunas=3, centro_livre=True, numero_folhas=9,
+        tipo="palavras",
+        palavras=tuple(f"p{i}" for i in range(9)),
+        linhas=3,
+        colunas=3,
+        centro_livre=True,
+        numero_folhas=9,
     )
     folhas = gerar_jogo(cfg)
     identidades = {frozenset(c for c in folha if c is not None) for folha in folhas}
@@ -69,8 +77,12 @@ def test_folhas_com_os_mesmos_elementos_em_outra_ordem_contam_como_iguais():
 
 def test_jogo_grande_continua_sem_repetir():
     cfg = ConfiguracaoJogo(
-        tipo="palavras", palavras=tuple(f"p{i}" for i in range(12)),
-        linhas=3, colunas=3, centro_livre=True, numero_folhas=30,
+        tipo="palavras",
+        palavras=tuple(f"p{i}" for i in range(12)),
+        linhas=3,
+        colunas=3,
+        centro_livre=True,
+        numero_folhas=30,
     )
     folhas = gerar_jogo(cfg)
     identidades = {frozenset(c for c in folha if c is not None) for folha in folhas}

@@ -85,7 +85,10 @@ def test_folhas_acima_das_combinacoes_vira_422():
         json={
             "tipo": "palavras",
             "palavras": [f"p{i}" for i in range(9)],
-            "linhas": 3, "colunas": 3, "centro_livre": True, "numero_folhas": 10,
+            "linhas": 3,
+            "colunas": 3,
+            "centro_livre": True,
+            "numero_folhas": 10,
         },
     )
     assert r.status_code == 422
@@ -126,14 +129,19 @@ def test_logo_gigante_e_barrado_antes_de_abrir_a_imagem():
     # models.py precise contar os bytes do base64.
     r = client.post(
         "/api/preview",
-        json={**CONFIG, "logo_enviado": "data:image/png;base64," + "A" * (MAX_LOGO_CARACTERES + 1)},
+        json={
+            **CONFIG,
+            "logo_enviado": "data:image/png;base64," + "A" * (MAX_LOGO_CARACTERES + 1),
+        },
     )
     assert r.status_code == 422
 
 
 def test_universo_acima_do_teto_e_rejeitado_pelo_schema():
     """O Pydantic barra antes de `universo` materializar a tupla."""
-    r = client.post("/api/preview", json={**CONFIG, "numero_elementos": MAX_ELEMENTOS + 1})
+    r = client.post(
+        "/api/preview", json={**CONFIG, "numero_elementos": MAX_ELEMENTOS + 1}
+    )
     assert r.status_code == 422
 
     r = client.post(

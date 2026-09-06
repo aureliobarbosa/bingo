@@ -218,10 +218,16 @@ def desenhar_folha(
             # Bloco de linhas centrado na célula; o 0,25 compensa opticamente a
             # altura das maiúsculas, que ficam acima da linha de base.
             primeira = (
-                y + lado / 2 + len(linhas_texto) * passo / 2 - passo + tamanho_fonte * 0.25
+                y
+                + lado / 2
+                + len(linhas_texto) * passo / 2
+                - passo
+                + tamanho_fonte * 0.25
             )
             for numero, linha_texto in enumerate(linhas_texto):
-                c.drawCentredString(x + lado / 2, primeira - numero * passo, linha_texto)
+                c.drawCentredString(
+                    x + lado / 2, primeira - numero * passo, linha_texto
+                )
 
     # Contorno externo mais forte.
     c.setLineWidth(2)

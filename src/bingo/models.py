@@ -161,9 +161,8 @@ class ConfiguracaoJogo:
 
         formato = cabecalho.removeprefix("data:").split(";")[0]
         if formato not in FORMATOS_LOGO:
-            raise ValueError(
-                f"O logo precisa ser PNG ou JPEG (recebido: {formato or 'desconhecido'})."
-            )
+            recebido = formato or "desconhecido"
+            raise ValueError(f"O logo precisa ser PNG ou JPEG (recebido: {recebido}).")
 
         # base64 usa 4 caracteres para cada 3 bytes; o '=' final é enchimento.
         bytes_imagem = len(dados) * 3 // 4 - dados.count("=")

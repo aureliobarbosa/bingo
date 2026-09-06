@@ -29,7 +29,17 @@
         "anthropic.claude-code"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/opt/venv/bin/python"
+        "python.defaultInterpreterPath": "/opt/venv/bin/python",
+        "ruff.path": [
+          "/opt/venv/bin/ruff"
+        ],
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports.ruff": "explicit"
+          }
+        }
       }
     }
   }

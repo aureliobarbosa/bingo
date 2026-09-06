@@ -81,7 +81,8 @@ async def limitar_tamanho_do_corpo(request: Request, call_next):
             tamanho = int(declarado)
         except ValueError:
             return JSONResponse(
-                status_code=400, content={"detail": "Cabeçalho Content-Length inválido."}
+                status_code=400,
+                content={"detail": "Cabeçalho Content-Length inválido."},
             )
         if tamanho > MAX_CORPO_BYTES:
             limite = MAX_CORPO_BYTES // (1024 * 1024)

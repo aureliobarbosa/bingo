@@ -58,7 +58,10 @@ def test_elementos_devem_superar_os_elementos_por_folha():
 def test_palavras_vazias_sao_rejeitadas():
     with pytest.raises(ValueError, match="linhas vazias"):
         ConfiguracaoJogo(
-            tipo="palavras", palavras=("a", "  ", "c"), linhas=1, colunas=2,
+            tipo="palavras",
+            palavras=("a", "  ", "c"),
+            linhas=1,
+            colunas=2,
             centro_livre=False,
         )
 
@@ -66,7 +69,10 @@ def test_palavras_vazias_sao_rejeitadas():
 def test_palavras_repetidas_sao_rejeitadas():
     with pytest.raises(ValueError, match="repetições"):
         ConfiguracaoJogo(
-            tipo="palavras", palavras=("a", "b", "a"), linhas=1, colunas=2,
+            tipo="palavras",
+            palavras=("a", "b", "a"),
+            linhas=1,
+            colunas=2,
             centro_livre=False,
         )
 
@@ -116,8 +122,12 @@ PALAVRAS_9 = tuple(f"p{i}" for i in range(9))
 def _cfg_9_em_3x3(numero_folhas: int) -> ConfiguracaoJogo:
     """9 palavras numa grade 3x3 com centro livre: 8 por folha, C(9,8) = 9."""
     return ConfiguracaoJogo(
-        tipo="palavras", palavras=PALAVRAS_9, linhas=3, colunas=3,
-        centro_livre=True, numero_folhas=numero_folhas,
+        tipo="palavras",
+        palavras=PALAVRAS_9,
+        linhas=3,
+        colunas=3,
+        centro_livre=True,
+        numero_folhas=numero_folhas,
     )
 
 
@@ -138,11 +148,15 @@ def test_pedir_mais_folhas_do_que_existem_combinacoes():
 
 
 def test_universo_grande_e_limitado_pelo_teto_do_servico():
-    """Com 75 números em 5x5 as combinações são astronômicas: quem limita é MAX_FOLHAS."""
+    """Com 75 números em 5x5 as combinações são astronômicas: limita o MAX_FOLHAS."""
     import math
 
     cfg = ConfiguracaoJogo(
-        numero_elementos=75, linhas=5, colunas=5, centro_livre=True, numero_folhas=MAX_FOLHAS
+        numero_elementos=75,
+        linhas=5,
+        colunas=5,
+        centro_livre=True,
+        numero_folhas=MAX_FOLHAS,
     )
     assert cfg.combinacoes_possiveis == math.comb(75, 24)
     assert cfg.maximo_folhas == MAX_FOLHAS

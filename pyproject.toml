@@ -16,6 +16,7 @@ dev = [
     "pytest>=8.3",
     "pypdf>=5.1",
     "httpx2>=2.12.0",
+    "ruff>=0.16.6",
 ]
 
 [build-system]
@@ -24,3 +25,9 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Regras mínimas: erros de sintaxe e de fluxo (E, F), imports ordenados (I).
+# O objetivo é pegar o que quebra, não impor estilo além do que o `ruff format`
+# já resolve sozinho.
+[tool.ruff.lint]
+select = ["E", "F", "I"]
