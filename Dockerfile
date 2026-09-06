@@ -4,13 +4,29 @@
 # monta o ambiente e `producao` só recebe o resultado. Assim o Python, o
 # reportlab e o pillow testados são exatamente os que servem em produção, sem
 # que o uv e as ferramentas de build acompanhem a imagem final.
+#
+# Os três partem da MESMA base, e isso não é preferência de estilo: `producao`
+# recebe o `.venv` pronto de `construcao`, e um venv não é relocável entre
+# instalações diferentes de Python. Ele grava o caminho absoluto do
+# interpretador (`/usr/local/bin/python3`, no `pyvenv.cfg` e nos symlinks de
+# `bin/`) e traz extensões compiladas contra uma libc — os `.so` são
+# `cpython-314-x86_64-linux-gnu`. Trocar a base de um estágio só (Alpine, por
+# exemplo) quebra a cópia de forma silenciosa.
+#
+# O uv entra por `COPY --from`, com a versão fixa em UV_VERSION. A alternativa
+# `ghcr.io/astral-sh/uv:python3.14-bookworm-slim` é esta mesma base oficial com
+# o uv embutido, mas não tem a versão do uv no nome da tag: a ferramenta
+# flutuaria a cada rebuild, enquanto o `uv.lock` fixa só as dependências.
+ARG UV_VERSION=0.9.30
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uv
 
 # --- desenvolvimento -------------------------------------------------------
 # O código vem montado pelo devcontainer, não copiado, para que as edições
 # apareçam na hora. O ambiente fica em /opt/venv, FORA do diretório montado:
 # dentro dele, o .venv do host esconderia o do container e os caminhos
 # absolutos gravados nele não valeriam aqui.
-FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS desenvolvimento
+FROM python:3.14-slim-bookworm AS desenvolvimento
+COPY --from=uv /uv /uvx /bin/
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
@@ -39,7 +55,8 @@ CMD ["uv", "run", "uvicorn", "bingo.api:app", \
      "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # --- construção ------------------------------------------------------------
-FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS construcao
+FROM python:3.14-slim-bookworm AS construcao
+COPY --from=uv /uv /uvx /bin/
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
