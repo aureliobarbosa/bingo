@@ -450,16 +450,22 @@ vazio no lugar e o git passa a reclamar.
 Como o `git` vem de uma camada nova da imagem, as mudanças exigem **Rebuild
 Container** — reabrir não basta.
 
-**`safe.directory` — decidido aguardar o problema ocorrer.** O `/app` chega por
-*bind mount*; quando o dono dos arquivos no host tem UID diferente do `root` do
-container, o git recusa a operação com *"detected dubious ownership in repository
-at '/app'"*. A correção é uma linha (`git config --global --add safe.directory
-/app`, no `postCreateCommand`), mas ela **não foi aplicada preventivamente**: o
-sintoma pode simplesmente não aparecer nesta combinação de host e container, e
-adicionar a exceção antes de precisar dela desliga uma proteção sem evidência de
-que faça falta. Fica registrado aqui para não custar diagnóstico se surgir.
+**`safe.directory` — não é necessário, e o motivo é verificável.** O `/app` chega
+por *bind mount*; quando o dono dos arquivos no host tem UID diferente do usuário
+do container, o git recusa a operação com *"detected dubious ownership in
+repository at '/app'"*. Decidiu-se, na hora, aguardar o sintoma em vez de
+adicionar a exceção preventivamente — desligar uma proteção sem evidência de que
+faça falta. O sintoma não apareceu, e a medição explica por quê: `/app` e
+`/app/.git` pertencem a `0:0` e o container roda como `root`, então os UIDs
+coincidem e a checagem do git nunca dispara.
 
-Commit: `chore: instala git e a extensão do Claude no devcontainer`.
+Fica registrado porque a conclusão vale para **esta** configuração, não em geral:
+voltaria a morder num host cujo UID não fosse 0 ou num container que rodasse como
+usuário sem privilégios — como o estágio `producao` já faz. A correção, se um dia
+for preciso, é uma linha: `git config --global --add safe.directory /app`, no
+`postCreateCommand`.
+
+Commit: `chore: ferramentas de trabalho dentro do devcontainer`.
 
 ### 7.2 Base única nos três estágios e versão do uv fixada — **concluída**
 
