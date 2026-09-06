@@ -137,6 +137,13 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   o `env.UV_VERSION` de `.github/workflows/ci.yml`. Elas devem andar juntas,
   senão o CI resolve dependências com uma ferramenta diferente da que constrói
   a imagem.
+- **`comando | head` sob `set -o pipefail` reprova ao acaso.** O `head` fecha o
+  cano e quem escreve morre de EPIPE — mas só quando a saída não cabe no buffer
+  de 64 KB do pipe. Foi assim que o `scripts/fumaca.sh` passou localmente e
+  quebrou no CI. Escreva num arquivo e confira o arquivo.
+- **Nem toda action publica tag móvel de major.** O `astral-sh/setup-uv` parou
+  na v7: `@v10` não existe e o job morre no "Set up job". Confira a tag pela API
+  (`/repos/<dono>/<repo>/git/ref/tags/<tag>`) antes de escrevê-la no workflow.
 - **Construir a imagem não prova que ela funciona.** As armadilhas do
   `RAIZ_PROJETO`, do `static/` e do venv não-relocável passam pelo build e só
   quebram na primeira requisição. Por isso o job `imagem` sobe o container e

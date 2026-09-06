@@ -666,12 +666,37 @@ import não usado nos testes). O `ruff.path` no devcontainer aponta para
 `/opt/venv/bin/ruff`, para que o editor use a mesma versão do `uv.lock` e do CI,
 e não a que a extensão embute.
 
-### Versões das actions, confirmadas na escrita
+### Versões das actions
 
-`actions/checkout@v7`, `astral-sh/setup-uv@v10`, `docker/setup-buildx-action@v4`
-e `docker/build-push-action@v7`. A versão do uv fica em `env.UV_VERSION`,
-espelhando o `ARG UV_VERSION` do `Dockerfile` — as duas mudam juntas, senão o CI
-resolve dependências com uma ferramenta diferente da que constrói a imagem.
+`actions/checkout@v7`, `astral-sh/setup-uv@v10.0.1`,
+`docker/setup-buildx-action@v4` e `docker/build-push-action@v7`.
+
+**O setup-uv é o fora da curva, e derrubou a primeira execução.** Ele parou de
+publicar as tags móveis de major depois da v7: `tags/v10` dá 404, só existem
+versões completas. Escrito como `@v10`, o job morre no "Set up job", antes de
+qualquer passo próprio. Conferir a tag pela API (`/git/ref/tags/<tag>`) é mais
+confiável do que ler a página de releases, que foi como o erro entrou.
+
+A versão do uv fica em `env.UV_VERSION`, espelhando o `ARG UV_VERSION` do
+`Dockerfile` — as duas mudam juntas, senão o CI resolve dependências com uma
+ferramenta diferente da que constrói a imagem.
+
+### O primeiro CI foi vermelho, e o segundo motivo era o próprio teste
+
+Além da tag inexistente, o `scripts/fumaca.sh` reprovava por defeito próprio:
+`curl | head -c 4` sob `set -o pipefail`. O `head` fecha o cano depois dos
+primeiros bytes, o curl morre de EPIPE e o pipeline falha — **mas só quando a
+resposta não cabe no buffer de 64 KB do pipe**, o que faz da reprovação uma
+corrida. Com o PDF de 48 KB, passou na primeira execução local e falhou nas
+seguintes com o mesmo comando.
+
+O script deixou de ter pipe a partir do curl: cada resposta vai para um arquivo
+e é conferida de lá — código HTTP, assinatura e tamanho, cada falha com sua
+mensagem. Validado em 10 execuções seguidas, contra porta morta e contra um
+servidor que responde 200 com texto no lugar do PDF.
+
+Execução verde: `testes` 12s, `estatica` 12s, `imagem` 22s — os 22s incluem
+construir o estágio `producao`, subir o container e a fumaça.
 
 ## Decisões de publicação — tomadas antes da execução
 
