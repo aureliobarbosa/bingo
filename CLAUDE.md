@@ -135,6 +135,12 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   inicialização morre no meio — sem preview, sem eventos ligados e sem saída pela
   interface, já que não existe botão de restaurar padrões (dispensado no item
   6.1.4 de `docs/DECISOES.md`, com o motivo registrado lá).
+- **Ao trocar o preview, não revogar a URL do blob na hora.** Se o navegador
+  estiver configurado para baixar PDF em vez de exibir (no Firefox, o tipo
+  `application/pdf` como "Salvar arquivo"), o diálogo de download fica apontando
+  para uma URL já revogada e salva um **arquivo vazio**. `exibirPdf` em
+  `static/app.js` revoga a anterior no `load` do `iframe`, com tempo limite para
+  não vazar quando o `load` nunca vem — que é justamente o caso do download.
 - **Chrome headless não renderiza PDF** dentro de `iframe`; o `iframe` aparece
   preto nos screenshots mesmo com tudo funcionando. Verifique pelo DOM
   (`preview.src` começa com `blob:`). **Firefox headless não roda neste ambiente**

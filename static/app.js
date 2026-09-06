@@ -80,6 +80,7 @@ const FORMATOS_LOGO = ["image/png", "image/jpeg"];
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 const MAX_FOLHAS = 100; // precisa acompanhar MAX_FOLHAS em src/bingo/models.py
 const MAX_PALAVRA_CARACTERES = 50; // idem, MAX_PALAVRA_CARACTERES em models.py
+const ESPERA_LIBERAR_BLOB_MS = 60_000;
 
 /* Imagem enviada pelo usuário. Fica só em memória: um data URI de alguns MB
  * estouraria a cota do localStorage e derrubaria o resto da configuração. */
@@ -231,11 +232,28 @@ function alternarTipo() {
 
 /* ----------------------------------------------------------------- preview */
 
+/* Libera a URL anterior só depois que o novo documento carregar.
+ *
+ * Revogando na hora, um navegador configurado para BAIXAR o PDF em vez de
+ * exibi-lo fica com o diálogo de download apontando para uma URL que já não
+ * existe, e salva um arquivo vazio. O tempo limite é a rede de segurança: no
+ * caso do download o `load` nunca vem, e sem ele a URL vazaria. */
+function liberarUrlAntiga(url) {
+  let liberada = false;
+  const liberar = () => {
+    if (liberada) return;
+    liberada = true;
+    URL.revokeObjectURL(url);
+  };
+  el.preview.addEventListener("load", liberar, { once: true });
+  setTimeout(liberar, ESPERA_LIBERAR_BLOB_MS);
+}
+
 function exibirPdf(blob) {
-  const nova = URL.createObjectURL(blob);
-  el.preview.src = nova + "#view=Fit";
-  if (urlAtual) URL.revokeObjectURL(urlAtual);
-  urlAtual = nova;
+  const anterior = urlAtual;
+  urlAtual = URL.createObjectURL(blob);
+  el.preview.src = urlAtual + "#view=Fit";
+  if (anterior) liberarUrlAntiga(anterior);
 }
 
 /* Responde na hora a qualquer mudança do formulário: troca os campos
