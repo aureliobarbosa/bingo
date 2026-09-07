@@ -15,5 +15,8 @@ wheels/
 # PDFs gerados
 *.pdf
 
+# Linter
+.ruff_cache/
+
 # AI TOOLS
 .claude/
