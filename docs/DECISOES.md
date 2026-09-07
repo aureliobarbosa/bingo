@@ -809,6 +809,54 @@ do que o abuso em si.
 
 ---
 
+## Etapa 8.2 — Publicação no Cloud Run — **em andamento**
+
+O contêiner já atende ao Cloud Run (`9de7eba`). Falta o caminho de publicação:
+autenticação e `push` no job `imagem`, o `deploy.yml` com o WIF e as
+salvaguardas de custo.
+
+### A porta vem da variável `PORT`, e o `exec` preserva o PID 1
+
+O Cloud Run injeta `PORT=8080` no contêiner e ignora o `EXPOSE`, enquanto o
+`CMD` fixava 8000: o serviço subiria numa porta que ninguém procura e o deploy
+nunca ficaria pronto. Como a forma exec do `CMD` não expande variáveis, ele
+passou à forma shell.
+
+O `exec` não é enfeite: sem ele o `sh` continua sendo o PID 1, recebe o
+`SIGTERM` do encerramento e não o repassa — cada instância derrubada esperaria
+o tempo limite antes de morrer à força. Com ele, o uvicorn substitui o shell no
+mesmo processo e recebe o sinal direto.
+
+O `HEALTHCHECK` tinha a mesma porta fixa e não pode discordar do `CMD`. Ele
+continua na forma exec e lê a variável **em Python**
+(`os.environ.get('PORT', '8000')`), o que evita trazer um shell só para
+expandir. O Cloud Run o ignora, mas ele vale localmente e no job `imagem` do CI.
+O `EXPOSE 8000` ficou como documentação da porta padrão.
+
+### `--proxy-headers`, que deixou de ser opcional
+
+Atrás do Google Front End, todo pedido chega ao contêiner com o IP do proxy. Sem
+`--proxy-headers --forwarded-allow-ips='*'`, o limite de taxa por IP da Etapa
+8.3 veria o tráfego inteiro como um cliente só — isto é, não funcionaria.
+Confiar em qualquer proxy é aceitável exatamente porque o contêiner não recebe
+tráfego de mais ninguém; a mesma premissa que descarta o nginx.
+
+### Como foi verificado sem Docker
+
+O devcontainer não tem Docker, então a conferência foi feita sobre os comandos e
+não sobre a imagem: a expansão do `CMD` dá 8000 sem `PORT` e 8080 com
+`PORT=8080`; o `exec` preserva o PID (o mesmo número antes e depois); o `'*'`
+chega como um argumento único, sem expansão de glob; o `scripts/fumaca.sh` passa
+contra o serviço na 8080; e o `X-Forwarded-For` de teste aparece no log de
+acesso no lugar do IP local.
+
+Isso não substitui construir a imagem — as armadilhas do `RAIZ_PROJETO`, do
+`static/` e do venv não-relocável passam pelo build e só quebram na primeira
+requisição. Quem cobre esse buraco é o job `imagem` do CI, que constrói o
+estágio `producao` e roda o mesmo teste de fumaça contra o contêiner.
+
+---
+
 ## Avaliação de modelo e de contexto (pedido pelo usuário)
 
 > **Escrita no planejamento, revista em 2026-09-06.** As etapas 1–7 citadas

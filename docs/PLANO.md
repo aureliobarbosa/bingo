@@ -1,9 +1,9 @@
 # Bingo — o que falta fazer
 
 > **Andamento** — Etapas 0 a 7 concluídas, mais a 6.2 (limites de entrada), a
-> 6.3 (teto do universo) e a 8.1 (integração contínua). Restam a 8.2 (Cloud
-> Run), a 8.3 (limite de taxa e cache), a 9 (arquivo de configuração) e a 10
-> (documentação).
+> 6.3 (teto do universo) e a 8.1 (integração contínua). A 8.2 está em andamento:
+> o contêiner já está pronto, falta o caminho de publicação. Restam ainda a 8.3
+> (limite de taxa e cache), a 9 (arquivo de configuração) e a 10 (documentação).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
 ao mexer numa área pronta; não é preciso lê-lo inteiro para começar uma etapa. O
@@ -37,19 +37,12 @@ ordens de grandeza.
 **Decisão tomada:** Cloud Run. As alternativas avaliadas e o motivo do descarte
 de cada uma estão em [DECISOES.md](DECISOES.md).
 
-**`PORT` no `Dockerfile`.** O `CMD` fixa 8000 e o Cloud Run injeta 8080. A forma
-exec não expande variáveis; usar
-`CMD ["sh", "-c", "exec uvicorn bingo.api:app --host 0.0.0.0 --port ${PORT:-8000}"]`.
-O `exec` importa: sem ele o uvicorn não é PID 1 e perde o `SIGTERM` do
-encerramento. O `HEALTHCHECK` também fixa 8000 — o Cloud Run o ignora, mas ele
-vale localmente e deve seguir a mesma variável.
+**O contêiner já atende ao Cloud Run** desde `9de7eba`: porta pela variável
+`PORT` e cabeçalhos de proxy. O porquê está em [DECISOES.md](DECISOES.md). Falta
+só o caminho de publicação, abaixo.
 
 **Um único worker**, como já está: o Cloud Run escala criando instâncias, não
 fazendo fork de workers. Vários só multiplicariam a memória por instância.
-
-**`--proxy-headers --forwarded-allow-ips='*'`**, que deixa de ser opcional: o
-limite de taxa por IP da 8.3 depende do `X-Forwarded-For`. Confiar em qualquer
-proxy é aceitável porque o contêiner só recebe tráfego do Google Front End.
 
 **Publicação:** Workload Identity Federation no Actions, sem chave de conta de
 serviço no repositório; Artifact Registry; região `southamerica-east1`.
