@@ -126,7 +126,9 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   embutido; ela libera só o jsDelivr (CSS do Bootstrap) e `blob:` em `frame-src`
   e `object-src`, que é como o PDF do preview chega ao `<iframe>`. **Ao mexer no
   frontend, conferir se a CSP ainda cobre o que a página carrega** — o erro é
-  silencioso.
+  silencioso, e só um navegador de verdade responde. O teste severo é o
+  **Firefox**: o pdf.js é uma página comum, sujeita à CSP, enquanto o Chrome
+  desenha PDF por um visualizador interno que escapa das mesmas diretivas.
 - **O timeout de geração é o `--timeout=60s` do Cloud Run.** Um timeout dentro
   do processo não funciona: as rotas são `def` síncronas numa thread do pool, e
   cancelar a tarefa não interrompe a thread — medido, 504 saindo em 3,01 s para

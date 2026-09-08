@@ -46,11 +46,9 @@ cada escolha está em [DECISOES.md](DECISOES.md); em uma linha cada:
   timeout dentro do processo foi medido e descartado: com rotas síncronas na
   thread do pool, ele troca o código da resposta sem liberar recurso nenhum.
 
-**Falta uma conferência que este ambiente não faz**: abrir a página num
-navegador de verdade e ver o preview aparecer sob a CSP nova. Não há Chrome
-instalado aqui, e a CSP é o único item da 8.3 cujo erro seria silencioso — o
-`<iframe>` do preview ficaria em branco. A política libera `blob:` em
-`frame-src` e em `object-src` justamente por isso.
+A CSP era o único item cujo erro seria silencioso, e ela foi conferida no
+Firefox pelo usuário: o preview aparece e o console não traz violação nenhuma.
+Como isso foi lido está em [DECISOES.md](DECISOES.md).
 
 ---
 

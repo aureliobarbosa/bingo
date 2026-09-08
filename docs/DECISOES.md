@@ -1001,6 +1001,34 @@ script embutido, nem atributo `style=`, nem `innerHTML` em lugar nenhum. As duas
 domínio `run.app` já vem na lista de pré-carga dos navegadores. CORS segue
 desnecessário — frontend e API são a mesma origem.
 
+### Como foi verificado
+
+Os 70 testes e o `ruff` cobrem o que é determinístico: os cabeçalhos em cada
+tipo de resposta, o 304 da revalidação, a janela deslizante e o 429.
+
+O limite de taxa foi exercitado contra um `uvicorn` de verdade, não só pelo
+`TestClient`, porque é lá que o middleware roda no laço de eventos com
+requisições separadas: 125 chamadas seguidas a `/api/preview` deram **120
+respostas 200 e 5 respostas 429**, com `Retry-After: 58`. O contador conta o
+que promete.
+
+A CSP não tem como ser testada daqui — quem obedece a ela é o navegador, e não
+há nenhum instalado neste ambiente. Quem conferiu foi o usuário, no Firefox, e
+o jeito de ler o resultado vale registrar:
+
+**A ausência de erro é prova fraca; o aviso do pdf.js é prova forte.** O console
+não trouxe nenhuma linha de `Content-Security-Policy`, mas trouxe um aviso do
+próprio pdf.js sobre a URL do blob (`Invalid absolute docBaseUrl:
+"blob:http://localhost:8000/..."`, que é ele tentando usar o blob como base
+para links relativos que os nossos PDFs não têm). Esse aviso só pode existir se
+o visualizador **abriu** o blob — ou seja, é o `frame-src blob:` funcionando,
+dito pelo lado de dentro. Console silencioso poderia ser CSP correta ou preview
+que nem foi tentado; o aviso distingue os dois casos.
+
+O Firefox é o teste severo dos dois navegadores: o pdf.js é uma página comum,
+sujeita à CSP da página que o criou. O Chrome desenha PDF por um visualizador
+interno, que não passa pelas mesmas diretivas — passar nele diria menos.
+
 ### O timeout de geração já existe, e um em processo seria teatro
 
 O plano pedia "timeout de geração". Ele já está no `deploy.yml`, como
