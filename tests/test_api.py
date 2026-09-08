@@ -2,13 +2,27 @@
 
 import io
 
+import pytest
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
+from bingo import api
 from bingo.api import MAX_CORPO_BYTES, MAX_LOGO_CARACTERES, app
 from bingo.models import MAX_ELEMENTOS, MAX_PALAVRA_CARACTERES
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def cota_cheia():
+    """O limite de taxa vive num dicionário de módulo, que sobrevive ao teste.
+
+    Sem zerá-lo, a ordem dos testes passaria a importar e um arquivo maior
+    acabaria esbarrando na cota por acidente.
+    """
+    api._historico.clear()
+    api._proxima_limpeza = 0.0
+
 
 CONFIG = {
     "tipo": "numeros",
@@ -153,3 +167,55 @@ def test_universo_acima_do_teto_e_rejeitado_pelo_schema():
         },
     )
     assert r.status_code == 422
+
+
+def test_janela_deslizante_libera_quando_a_janela_passa():
+    for i in range(api.MAX_REQUISICOES_POR_JANELA):
+        assert api._espera_necessaria("10.0.0.1", 1000.0 + i * 0.001) == 0.0
+
+    espera = api._espera_necessaria("10.0.0.1", 1000.5)
+    assert espera > 0
+
+    # Passada a janela inteira, a cota volta sozinha.
+    depois = 1000.0 + api.JANELA_SEGUNDOS + 1
+    assert api._espera_necessaria("10.0.0.1", depois) == 0.0
+
+
+def test_o_limite_conta_por_ip():
+    for _ in range(api.MAX_REQUISICOES_POR_JANELA):
+        api._espera_necessaria("10.0.0.1", 1000.0)
+
+    assert api._espera_necessaria("10.0.0.1", 1000.0) > 0
+    assert api._espera_necessaria("10.0.0.2", 1000.0) == 0.0
+
+
+def test_o_historico_solta_os_ips_que_sumiram():
+    """A limpeza roda uma vez por janela; sem ela o dicionário cresceria sem fim."""
+    api._espera_necessaria("10.0.0.1", 1000.0)
+    api._espera_necessaria("10.0.0.2", 1000.0 + api.JANELA_SEGUNDOS + 1)
+
+    assert "10.0.0.1" not in api._historico
+    assert "10.0.0.2" in api._historico
+
+
+def test_excesso_de_requisicoes_vira_429(monkeypatch):
+    monkeypatch.setattr(api, "MAX_REQUISICOES_POR_JANELA", 2)
+
+    assert client.post("/api/preview", json=CONFIG).status_code == 200
+    assert client.post("/api/preview", json=CONFIG).status_code == 200
+
+    r = client.post("/api/preview", json=CONFIG)
+    assert r.status_code == 429
+    assert int(r.headers["retry-after"]) >= 1
+    assert "Espere um instante" in r.json()["detail"]
+
+
+def test_o_limite_de_taxa_nao_alcanca_a_pagina_nem_os_estaticos(monkeypatch):
+    monkeypatch.setattr(api, "MAX_REQUISICOES_POR_JANELA", 1)
+
+    assert client.post("/api/preview", json=CONFIG).status_code == 200
+    assert client.post("/api/preview", json=CONFIG).status_code == 429
+
+    # Quem estourou a cota de gerar PDF continua conseguindo abrir a página.
+    assert client.get("/").status_code == 200
+    assert client.get("/static/app.js").status_code == 200
