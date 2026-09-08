@@ -116,6 +116,14 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   uvicorn sobe com `--proxy-headers --forwarded-allow-ips='*'`: sem o
   `X-Forwarded-For`, o limite de taxa por IP da Etapa 8.3 veria todo o tráfego
   como um cliente só.
+- **A publicação vive no `.github/workflows/deploy.yml`**, separado do `ci.yml`
+  porque o WIF exige `id-token: write` e o `ci.yml` roda em pull request — a
+  permissão alcançaria código de terceiros. O `deploy.yml` constrói, testa a
+  fumaça, empurra ao Artifact Registry e implanta pelo **digest** lido de volta
+  do registro, nunca pela tag. Ele se pula sozinho se `vars.GCP_WIF_PROVIDER`
+  estiver vazia. Nenhuma chave existe: o WIF troca o token OIDC do GitHub por
+  credencial temporária, e `scripts/configura-gcp.sh` recria tudo do lado do
+  Google. O serviço roda como `bingo-runtime`, conta **sem papel nenhum**.
 
 ## Armadilhas já encontradas
 
@@ -183,14 +191,18 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
 
 ## Desempenho medido
 
-Medidas do container de produção, úteis para dimensionar hospedagem:
+Medidas do container local e, depois, do serviço já publicado:
 
-| Medida | Valor |
-|---|---|
-| Memória em uso | 47 MB |
-| Partida a frio até responder | 2,8 s |
-| Gerar 100 folhas (o pedido mais caro) | 0,38 s |
-| Imagem de produção | 382 MB |
+| Medida | Container local | Cloud Run |
+|---|---|---|
+| Memória em uso | 47 MB | — |
+| Partida a frio até responder | 2,8 s | 2,56 s (após 17 min ocioso) |
+| Requisição com a instância quente | — | 0,25 s |
+| Gerar 100 folhas (o pedido mais caro) | 0,38 s | 0,67 s pela rede |
+| Imagem de produção | 382 MB | — |
+
+A partida a frio quase igual nos dois lados indica que o tempo é do processo
+subindo (Python, FastAPI, reportlab), não da infraestrutura alocando instância.
 
 ## Verificação da interface sem navegador interativo
 

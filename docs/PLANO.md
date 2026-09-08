@@ -1,9 +1,9 @@
 # Bingo — o que falta fazer
 
-> **Andamento** — Etapas 0 a 7 concluídas, mais a 6.2 (limites de entrada), a
-> 6.3 (teto do universo) e a 8.1 (integração contínua). A 8.2 está em andamento:
-> o contêiner já está pronto, falta o caminho de publicação. Restam ainda a 8.3
-> (limite de taxa e cache), a 9 (arquivo de configuração) e a 10 (documentação).
+> **Andamento** — Etapas 0 a 8.2 concluídas: o serviço está publicado em
+> `https://bingo-286308093839.southamerica-east1.run.app` e cada push em `main`
+> implanta sozinho. Restam a 8.3 (limite de taxa e cache), a 9 (arquivo de
+> configuração) e a 10 (documentação).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
 ao mexer numa área pronta; não é preciso lê-lo inteiro para começar uma etapa. O
@@ -14,7 +14,7 @@ resumo de uma linha por decisão está no [CLAUDE.md](../CLAUDE.md).
 Serviço *stateless* que gera cartelas de bingo em PDF para impressão: FastAPI e
 reportlab no backend, Bootstrap 5 com JavaScript sem build step no frontend. O
 devcontainer e a imagem de produção saem do mesmo `Dockerfile`, com base única
-nos três estágios. Os 58 testes passam. Falta publicar.
+nos três estágios. Os 58 testes passam e o serviço está publicado no Cloud Run.
 
 **Origem das etapas 6.2 a 9:** um briefing produzido numa sessão paralela sobre
 hospedagem, servidor e armazenamento, conferido contra o código. Ele confirmou
@@ -31,42 +31,6 @@ segundo. Os alunos **não acessam o serviço**: recebem papel impresso. Somado a
 que foi medido no container (47 MB de memória, 0,38 s para gerar 100 folhas), o
 dimensionamento é trivial: um único processo `uvicorn` atende com folga de várias
 ordens de grandeza.
-
-### 8.2 Publicação no Google Cloud Run
-
-**Decisão tomada:** Cloud Run. As alternativas avaliadas e o motivo do descarte
-de cada uma estão em [DECISOES.md](DECISOES.md).
-
-**O contêiner já atende ao Cloud Run** desde `9de7eba`: porta pela variável
-`PORT` e cabeçalhos de proxy. O porquê está em [DECISOES.md](DECISOES.md). Falta
-só o caminho de publicação, abaixo.
-
-**Um único worker**, como já está: o Cloud Run escala criando instâncias, não
-fazendo fork de workers. Vários só multiplicariam a memória por instância.
-
-**Publicação:** Workload Identity Federation no Actions, sem chave de conta de
-serviço no repositório; Artifact Registry; região `southamerica-east1`.
-
-**Construir uma vez e promover**, decidido na 8.1: o job `imagem` do CI já
-constrói o estágio `producao`, etiqueta com o SHA e valida com o
-`scripts/fumaca.sh`. Falta dar-lhe autenticação e `push`, e fazer o deploy
-apontar o Cloud Run para o **digest** — não para a tag, que pode ser reescrita.
-Implanta-se o binário exato que passou nos testes, e o rollback vira apontar
-para o digest anterior. Pede uma política de limpeza no Artifact Registry.
-
-O `deploy.yml` é **um arquivo separado** do `ci.yml`, e por permissão, não por
-estética: ele precisa de `id-token: write` para o WIF, e num arquivo só essa
-permissão alcançaria os jobs que executam código de pull request.
-
-**Salvaguardas**, dimensionadas pelo que foi medido: `--memory 256Mi`,
-`--cpu 1`, `--min-instances 0`, `--max-instances 3`, timeout de requisição e
-alerta de orçamento na conta. Com o serviço aberto, o teto de instâncias é o que
-limita a exposição financeira.
-
-Verificação: abrir a URL pública, gerar um PDF, conferir páginas e logo, e medir
-a partida a frio real.
-
-Commit: `chore: publica o serviço no Cloud Run`.
 
 ### 8.3 Limite de taxa, cache e cabeçalhos
 

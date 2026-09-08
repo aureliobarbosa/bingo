@@ -809,11 +809,11 @@ do que o abuso em si.
 
 ---
 
-## Etapa 8.2 — Publicação no Cloud Run — **em andamento**
+## Etapa 8.2 — Publicação no Cloud Run — **concluída**
 
-O contêiner já atende ao Cloud Run (`9de7eba`). Falta o caminho de publicação:
-autenticação e `push` no job `imagem`, o `deploy.yml` com o WIF e as
-salvaguardas de custo.
+O serviço está no ar em
+`https://bingo-286308093839.southamerica-east1.run.app`, publicado pelo
+`deploy.yml` a cada push em `main`, sem nenhuma chave guardada em lugar algum.
 
 ### A porta vem da variável `PORT`, e o `exec` preserva o PID 1
 
@@ -841,19 +841,83 @@ Atrás do Google Front End, todo pedido chega ao contêiner com o IP do proxy. S
 Confiar em qualquer proxy é aceitável exatamente porque o contêiner não recebe
 tráfego de mais ninguém; a mesma premissa que descarta o nginx.
 
-### Como foi verificado sem Docker
+### Como foi verificado
 
-O devcontainer não tem Docker, então a conferência foi feita sobre os comandos e
-não sobre a imagem: a expansão do `CMD` dá 8000 sem `PORT` e 8080 com
-`PORT=8080`; o `exec` preserva o PID (o mesmo número antes e depois); o `'*'`
-chega como um argumento único, sem expansão de glob; o `scripts/fumaca.sh` passa
-contra o serviço na 8080; e o `X-Forwarded-For` de teste aparece no log de
-acesso no lugar do IP local.
+O devcontainer não tem Docker, então a primeira conferência foi feita sobre os
+comandos e não sobre a imagem: a expansão do `CMD` dá 8000 sem `PORT` e 8080 com
+`PORT=8080`; o `exec` preserva o PID; o `'*'` chega como argumento único, sem
+expansão de glob; e o `X-Forwarded-For` de teste aparece no log de acesso no
+lugar do IP local.
 
-Isso não substitui construir a imagem — as armadilhas do `RAIZ_PROJETO`, do
+Isso não substituiu construir a imagem — as armadilhas do `RAIZ_PROJETO`, do
 `static/` e do venv não-relocável passam pelo build e só quebram na primeira
-requisição. Quem cobre esse buraco é o job `imagem` do CI, que constrói o
-estágio `producao` e roda o mesmo teste de fumaça contra o contêiner.
+requisição. Quem fechou esse buraco foi o CI, e o job `imagem` passou a subir o
+contêiner **nas duas portas**: `PORT=8080`, que é o que o Cloud Run injeta, e o
+padrão de 8000, que é o que vale no `docker run` local. A expansão é uma linha
+de shell — falha inteira ou não falha —, mas descobrir isso no primeiro deploy
+seria caro, e o custo de cobrir é um `docker run` a mais.
+
+### O `push` não coube no `ci.yml`, e o motivo é o mesmo de sempre
+
+O plano previa que o job `imagem` do `ci.yml` ganhasse autenticação e `push`.
+Não dá: aquele workflow roda em pull request, e dar-lhe `id-token: write`
+entregaria credencial do projeto no Google a código de terceiros. A sequência
+inteira — construir, testar a fumaça, empurrar, implantar — foi para o
+`deploy.yml`, disparado só em push para `main`.
+
+Isso preserva a decisão de construir uma vez e promover: a imagem sai da máquina
+só depois de passar no teste, e o deploy aponta para o **digest lido de volta
+do registro** com `docker image inspect`, não para a tag. O `ci.yml` continua sem credencial nenhuma, validando PRs.
+
+O job se pula sozinho enquanto `vars.GCP_WIF_PROVIDER` estiver vazia. Sem isso,
+todo push em `main` teria ficado vermelho durante os dias entre escrever o
+workflow e terminar a configuração do Google.
+
+### Duas contas de serviço, e uma delas sem papel nenhum
+
+A `github-deploy` publica e implanta (`artifactregistry.writer`, `run.admin`, e
+`iam.serviceAccountUser` sobre a outra). A `bingo-runtime` é a identidade que o
+contêiner veste ao rodar e **não tem papel algum**, de propósito: o serviço é
+stateless e não chama nada do Google. Sem ela o Cloud Run usaria a conta padrão
+do Compute Engine, que costuma vir com poder de Editor sobre o projeto inteiro —
+poder de sobra para uma rota pública sem autenticação.
+
+Nenhuma chave JSON foi criada. O GitHub apresenta um token OIDC de curta duração
+e o Google o troca por credencial temporária; quem autoriza é a condição
+`assertion.repository == 'aureliobarbosa/bingo'` no provedor. Sem essa condição,
+qualquer repositório do GitHub no mundo poderia fazer a mesma troca.
+
+### A configuração do Google virou script
+
+`scripts/configura-gcp.sh` faz os doze comandos do `gcloud` na ordem certa e
+imprime, ao final, as quatro Variables a cadastrar no GitHub. Existe porque
+ninguém repete isso de memória daqui a um ano, e porque um projeto recriado
+precisa sair igual. Roda no Cloud Shell, sem instalar nada. Os `create` toleram
+recurso já existente; qualquer outro erro aborta.
+
+O `gcloud` **não entra na imagem**: ela é o artefato implantado, e uma
+ferramenta de administração da nuvem dentro de um serviço público é poder que
+ele nunca precisa ter. É o mesmo raciocínio da conta sem papéis.
+
+### O que a execução mediu
+
+| Medida | Valor |
+|---|---|
+| Partida a frio, após 17 min ocioso | 2,56 s |
+| Requisição com a instância quente | 0,25 s |
+| Gerar 100 folhas pela rede | 0,67 s, 160 KB, 100 páginas |
+
+A partida a frio de 2,56 s ficou perto dos 2,8 s medidos no contêiner local, o
+que indica que o tempo é quase todo do processo subindo — Python, FastAPI e
+reportlab carregando — e não da infraestrutura alocando instância. No uso
+previsto o professor pega a partida a frio quase sempre, e 2,5 s até a página
+aparecer é aceitável; foi exatamente o que descartou o Render, que dorme e
+acorda em dezenas de segundos.
+
+Um aviso apareceu no primeiro deploy: o `docker/login-action@v3` tem como alvo o
+Node.js 20, descontinuado nos runners. Subiu para `v4`, que declara `node24`.
+Vale a armadilha já registrada — a tag foi conferida pela API antes de ser
+escrita no workflow.
 
 ---
 
