@@ -241,3 +241,39 @@ def test_estatico_sem_mudanca_volta_304_e_segue_pedindo_revalidacao():
 def test_index_tambem_pede_revalidacao():
     r = client.get("/")
     assert r.headers["cache-control"] == "no-cache"
+
+
+def test_cabecalhos_de_seguranca_na_pagina():
+    r = client.get("/")
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["x-frame-options"] == "DENY"
+    assert r.headers["referrer-policy"] == "no-referrer"
+    csp = r.headers["content-security-policy"]
+    assert "script-src 'self'" in csp
+    assert "frame-ancestors 'none'" in csp
+
+
+def test_a_csp_libera_o_que_a_pagina_de_fato_usa():
+    """Se a política apertar mais do que isto, o preview ou o Bootstrap somem."""
+    csp = client.get("/").headers["content-security-policy"]
+    # O PDF do preview chega como blob: dentro de um <iframe>.
+    assert "frame-src blob:" in csp
+    assert "object-src blob:" in csp
+    # O CSS do Bootstrap vem do jsDelivr.
+    assert "https://cdn.jsdelivr.net" in csp
+
+
+def test_o_pdf_tambem_sai_com_nosniff():
+    r = client.post("/api/preview", json=CONFIG)
+    assert r.status_code == 200
+    assert r.headers["x-content-type-options"] == "nosniff"
+
+
+def test_as_respostas_de_recusa_tambem_levam_os_cabecalhos(monkeypatch):
+    """O middleware é o mais externo, então cobre o que os de dentro recusam."""
+    monkeypatch.setattr(api, "MAX_REQUISICOES_POR_JANELA", 1)
+    client.post("/api/preview", json=CONFIG)
+
+    r = client.post("/api/preview", json=CONFIG)
+    assert r.status_code == 429
+    assert r.headers["x-content-type-options"] == "nosniff"

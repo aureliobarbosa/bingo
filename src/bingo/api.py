@@ -52,6 +52,40 @@ MAX_REQUISICOES_POR_JANELA = 120
 _historico: dict[str, deque[float]] = {}
 _proxima_limpeza = 0.0
 
+# Política de conteúdo. A página só carrega o próprio JS e CSS, mais o
+# Bootstrap do jsDelivr; não há script embutido, `style=` embutido nem
+# `innerHTML` em lugar nenhum, então dá para fechar tudo sem `unsafe-inline`.
+#
+# `blob:` aparece porque o preview é o PDF vindo do `fetch` virando URL de blob
+# num `<iframe>`. Ele é liberado em `frame-src` e em `object-src`: os dois
+# caminhos que navegadores já usaram para desenhar PDF embutido, e não vale
+# descobrir qual é o de hoje quebrando o preview de alguém.
+CSP = "; ".join(
+    (
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' https://cdn.jsdelivr.net",
+        "img-src 'self' data:",
+        "frame-src blob:",
+        "object-src blob:",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+    )
+)
+
+# `frame-ancestors` acima já cobre navegador atual; o `X-Frame-Options` fica
+# pelos antigos. Não há `Strict-Transport-Security`: o cabeçalho é ignorado
+# fora do HTTPS, e o domínio `run.app` já vem na lista de pré-carga dos
+# navegadores — repeti-lo não mudaria nada.
+CABECALHOS_DE_SEGURANCA = {
+    "Content-Security-Policy": CSP,
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+}
+
 Palavra = Annotated[str, StringConstraints(max_length=MAX_PALAVRA_CARACTERES)]
 
 app = FastAPI(title="Bingo", description="Gerador de cartelas de bingo para impressão")
@@ -181,6 +215,19 @@ async def limitar_taxa(request: Request, call_next):
             headers={"Retry-After": str(max(1, math.ceil(espera)))},
         )
     return await call_next(request)
+
+
+@app.middleware("http")
+async def cabecalhos_de_seguranca(request: Request, call_next):
+    """Carimba os cabeçalhos de segurança em toda resposta.
+
+    É o middleware mais externo — declarado por último, que é o que o Starlette
+    põe por fora —, então as respostas 413 e 429 devolvidas pelos de dentro
+    também passam por aqui.
+    """
+    resposta = await call_next(request)
+    resposta.headers.update(CABECALHOS_DE_SEGURANCA)
+    return resposta
 
 
 @app.exception_handler(ValueError)
