@@ -189,6 +189,30 @@ def test_o_limite_conta_por_ip():
     assert api._espera_necessaria("10.0.0.2", 1000.0) == 0.0
 
 
+def test_atras_do_hosting_o_limite_conta_por_visitante(monkeypatch):
+    """Sem ler o `Fastly-Client-Ip`, a CDN inteira contaria como um cliente só."""
+    monkeypatch.setattr(api, "MAX_REQUISICOES_POR_JANELA", 1)
+
+    def pedir(ip: str) -> int:
+        cabecalhos = {"Fastly-Client-Ip": ip}
+        return client.post("/api/preview", json=CONFIG, headers=cabecalhos).status_code
+
+    assert pedir("203.0.113.10") == 200
+    assert pedir("203.0.113.10") == 429
+
+    # Outro visitante, mesma CDN: cota própria.
+    assert pedir("203.0.113.11") == 200
+
+
+def test_sem_o_cabecalho_da_cdn_vale_o_ip_da_conexao(monkeypatch):
+    """Pelo `run.app` direto nada muda: continua valendo o `request.client`."""
+    monkeypatch.setattr(api, "MAX_REQUISICOES_POR_JANELA", 1)
+
+    assert client.post("/api/preview", json=CONFIG).status_code == 200
+    assert client.post("/api/preview", json=CONFIG).status_code == 429
+    assert "testclient" in api._historico
+
+
 def test_o_historico_solta_os_ips_que_sumiram():
     """A limpeza roda uma vez por janela; sem ela o dicionário cresceria sem fim."""
     api._espera_necessaria("10.0.0.1", 1000.0)

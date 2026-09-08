@@ -148,12 +148,22 @@ async def limitar_tamanho_do_corpo(request: Request, call_next):
 
 
 def _cliente(request: Request) -> str:
-    """IP de quem pediu.
+    """IP de quem pediu, pelos dois caminhos de entrada do serviço.
 
-    O uvicorn sobe com `--proxy-headers`, então atrás do Cloud Run isto já é o
-    IP real do cliente e não o do Google Front End. Sem aquilo, o serviço
-    inteiro contaria como um cliente só e este limite não funcionaria.
+    Pelo `run.app` direto, o uvicorn sobe com `--proxy-headers` e
+    `request.client` já é o IP real do cliente, não o do Google Front End.
+    Atrás do Firebase Hosting, não: quem fala com o Cloud Run é a CDN, e o IP
+    real do visitante vem em `Fastly-Client-Ip`. Sem lê-lo, todo o tráfego do
+    Hosting contaria como um cliente só e um usuário sozinho gastaria a cota
+    de todos os outros.
+
+    O cabeçalho é forjável por quem chame o `run.app` direto — mesma exposição
+    que o `--forwarded-allow-ips='*'` já aceitou junto com o `X-Forwarded-For`,
+    e não uma porta nova.
     """
+    da_cdn = request.headers.get("fastly-client-ip", "").strip()
+    if da_cdn:
+        return da_cdn
     return request.client.host if request.client else "desconhecido"
 
 
