@@ -12,9 +12,8 @@ resumo de uma linha por decisão está no [CLAUDE.md](../CLAUDE.md).
 ## Onde o projeto está
 
 Serviço *stateless* que gera cartelas de bingo em PDF para impressão: FastAPI e
-reportlab no backend, Bootstrap 5 com JavaScript sem build step no frontend. O
-devcontainer e a imagem de produção saem do mesmo `Dockerfile`, com base única
-nos três estágios. Os 58 testes passam e o serviço está publicado no Cloud Run.
+ReportLab Toolkit no backend, Bootstrap 5 com JavaScript sem build step no frontend. O devcontainer e a imagem de produção saem do mesmo `Dockerfile`, com base única
+nos três estágios. Os 58 testes passam e o serviço está publicado no Google Cloud Run.
 
 **Origem das etapas 6.2 a 9:** um briefing produzido numa sessão paralela sobre
 hospedagem, servidor e armazenamento, conferido contra o código. Ele confirmou
@@ -50,7 +49,9 @@ Os limites de tamanho já foram resolvidos na 6.2.
   frontend e API são a mesma origem.
 - **nginx está descartado** — ver o motivo em [DECISOES.md](DECISOES.md).
 
-Commit: `chore: limite de taxa, cache dos estáticos e cabeçalhos`.
+Commits: `chore: limite de taxa por IP`,
+`chore: cache dos estáticos`,
+`chore: cabeçalhos de segurança`.
 
 ---
 
@@ -59,8 +60,7 @@ Commit: `chore: limite de taxa, cache dos estáticos e cabeçalhos`.
 Hoje a configuração fica no `localStorage`, que **não guarda o logo**: alguns MB
 estourariam a cota. Ao recarregar a página o logo volta a ser o padrão. Um
 arquivo exportável resolve isso e ainda sobrevive a limpeza de navegador, troca
-de máquina e reimagem de laboratório pela TI da escola — e pode ser mandado por
-e-mail para um colega, o que vira compartilhamento sem custo de código.
+de máquina e atualização da imagem de laboratório pela TI da escola — e pode ser mandado por e-mail para um colega, o que vira compartilhamento sem custo de código.
 
 O `localStorage` **continua**, como conveniência no mesmo navegador; o arquivo é
 o caminho durável.
@@ -90,8 +90,13 @@ não redescobertas: **limpar o `value` do input depois de ler** e **não aninhar
 lançar**, pela mesma razão que `restaurar()` não pode: arquivo de outra versão ou
 corrompido vira mensagem na interface, não inicialização morta.
 
-**Botão "Sortear de novo"** em `index.html`, que gera nova semente e atualiza o
-preview.
+**Botão "Sortear novamente"** — ele **já existe** e funciona: é o `#btn-sortear`
+no fim do painel lateral, ligado a `atualizarPreview` em `static/app.js`. Hoje
+ele sorteia de novo por consequência, não por decisão: sem semente, cada
+requisição faz o servidor sortear outra vez. Com a semente, ele passa a **gerar
+uma semente nova** antes de atualizar o preview — senão o botão vira um botão
+que não faz nada, porque a mesma semente devolve a mesma cartela. Não há botão a
+criar; há um comportamento a acrescentar ao que existe.
 
 Commits: um para a semente com seus testes, outro para exportar/importar.
 
