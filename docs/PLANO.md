@@ -66,7 +66,10 @@ Já feito e commitado:
   como um cliente só (com dois testes; 72 no total).
 - `firebase.json`, `.firebaserc` e o `hosting/publico/` vazio de propósito.
 
-**Falta rodar** — exige login interativo, então é do usuário:
+**Falta rodar** — exige login interativo, então é do usuário. **Dentro do
+container, em `/app`**: é lá que o `firebase.json` está, e o `deploy` o lê do
+diretório atual. Nada a instalar — o container já traz Node 22 com `npx`, e
+`npx --yes firebase-tools@latest` baixa a CLI na hora (testado: 15.29.0).
 
 ```bash
 npx firebase-tools login --no-localhost
@@ -74,6 +77,13 @@ npx firebase-tools projects:addfirebase bingol-508013     # habilita o Firebase 
 npx firebase-tools hosting:sites:create bingo --project bingol-508013
 npx firebase-tools deploy --only hosting
 ```
+
+O `--no-localhost` não é detalhe: sem ele a CLI sobe um servidor em
+`localhost:9005` *dentro do container* e manda o navegador da máquina ir lá —
+a mesma armadilha do `--host 0.0.0.0` do uvicorn. Com ele, a CLI imprime uma
+URL para abrir no navegador da máquina e espera o código colado de volta. A
+credencial fica em `/root/.config/`, que não é montado do host: se o container
+for recriado, é refazer o login.
 
 O nome `bingo` respondia "Site Not Found" na conferência, o que indica livre; se
 o `sites:create` recusar, escolher outro e trocar o campo `site` do
