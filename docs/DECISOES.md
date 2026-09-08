@@ -921,6 +921,105 @@ escrita no workflow.
 
 ---
 
+## Etapa 8.3 — Limite de taxa, cache e cabeçalhos — **concluída**
+
+Os três itens fecham a lista de proteções que substituem a autenticação, pela
+decisão registrada em "Autenticação: serviço aberto, protegido por limites".
+
+### Limite de taxa: janela deslizante em memória, e o que ela não faz
+
+Um dicionário de IP para as marcas de tempo (`time.monotonic`) das requisições
+dentro de uma janela de 60 segundos, em `src/bingo/api.py`. Biblioteca padrão,
+como o resto do backend: uma dependência de limite de taxa traria Redis junto,
+e Redis para dez usuários por ano seria mais infraestrutura para esquecer no ar
+do que o próprio serviço.
+
+Não há cadeado, e não por descuido: toda a contabilidade roda dentro do
+middleware `async`, sem `await` no meio, então duas requisições nunca a
+executam ao mesmo tempo — o laço de eventos é um só. As rotas é que rodam em
+threads, e elas não tocam no dicionário.
+
+O dicionário é varrido uma vez por janela, soltando os IPs que não voltaram.
+Sem isso, um varredor de portas trocando de IP faria a memória crescer sem fim.
+
+**O teto é 120 por minuto**, generoso de propósito. O preview tem debounce de
+400 ms, o que põe o pior caso teórico de um humano em torno de 150 por minuto e
+o caso real bem abaixo; um bot em laço passa de 120 em segundos. A régua é
+essa: separar o professor do laço, não medir educadamente o professor.
+
+**O limite só alcança `/api/`.** Uma visita normal já pede três estáticos, e
+contá-los gastaria a cota de quem não fez nada de errado. O custo real está em
+gerar PDF. Quem estoura a cota continua conseguindo abrir a página — há teste
+para isso.
+
+**A limitação, dita por inteiro:** cada instância tem o seu próprio dicionário.
+Com `--max-instances 3` o teto efetivo é até 3x o configurado, e ele zera
+quando a instância recicla. Isso contém bot em laço; não contém atacante
+determinado, que exigiria armazenamento compartilhado. Quem limita a exposição
+financeira continua sendo o `--max-instances 3`, não este contador.
+
+O `--proxy-headers` do `Dockerfile`, decidido na 8.2, é o que faz o contador
+enxergar o IP do cliente em vez do Google Front End. As duas coisas caem
+juntas: sem ele, este limite veria o tráfego inteiro como um cliente só.
+
+### Cache dos estáticos: `no-cache`, que é revalidar e não desistir
+
+`StaticFiles` não manda `Cache-Control` nenhum, então a heurística do navegador
+decidia — e depois de uma edição no `app.js` ele podia seguir rodando a versão
+velha. A armadilha estava registrada no `CLAUDE.md` porque já custou
+diagnósticos errados.
+
+A subclasse `EstaticosRevalidados` manda `Cache-Control: no-cache`, que não é
+"não guarde" e sim "guarde, mas pergunte antes de usar". O `ETag` que o
+`FileResponse` já monta faz a pergunta caber num 304 sem corpo; há teste que
+confere o 304 e o cabeçalho nele. A rota `/` leva o mesmo cabeçalho — sem 304,
+porque conferir `If-None-Match` à mão não paga por um `index.html` de poucos KB.
+
+A alternativa era versão na URL (`app.js?v=hash`), que permite cache eterno mas
+pede o build step que o projeto não tem. Com uma dezena de usuários por ano,
+revalidar não custa nada e o build step custaria muito.
+
+### Cabeçalhos de segurança, e a CSP que coube apertada
+
+Middleware mais externo — declarado por último, que é onde o Starlette põe o de
+fora —, então as respostas 413 e 429 dos middlewares de dentro também saem com
+os cabeçalhos. A ordem foi conferida antes de escrever o código, não suposta.
+
+A política de conteúdo pôde dispensar `unsafe-inline` porque a página não tem
+script embutido, nem atributo `style=`, nem `innerHTML` em lugar nenhum. As duas
+únicas liberações são as que a página de fato usa, e cada uma tem teste:
+
+- **`https://cdn.jsdelivr.net` em `style-src`** — de onde vem o CSS do
+  Bootstrap. Conferido: os 23 `url()` desse arquivo são todos `data:`, nenhum
+  recurso externo. Por isso `img-src 'self' data:`.
+- **`blob:` em `frame-src` e `object-src`** — o PDF do preview chega pelo
+  `fetch`, vira URL de blob e é desenhado num `<iframe>`. Vai nas duas
+  diretivas porque ambas já foram o caminho de desenhar PDF embutido em algum
+  navegador, e o preço de errar é o preview em branco.
+
+**Sem `Strict-Transport-Security`**: o cabeçalho é ignorado fora do HTTPS e o
+domínio `run.app` já vem na lista de pré-carga dos navegadores. CORS segue
+desnecessário — frontend e API são a mesma origem.
+
+### O timeout de geração já existe, e um em processo seria teatro
+
+O plano pedia "timeout de geração". Ele já está no `deploy.yml`, como
+`--timeout=60s`: o Cloud Run corta a requisição de fora, que é o único lugar de
+onde dá para cortar.
+
+Um timeout dentro do processo foi medido antes de ser descartado. As rotas são
+`def` síncronas, que o Starlette executa numa thread do pool; `asyncio.wait_for`
+em volta cancela a *tarefa*, mas a thread não é interrompível e o
+`anyio.to_thread.run_sync` só devolve quando ela termina. Num teste com timeout
+de 0,5 s sobre um trabalho de 3 s, a resposta 504 saiu em **3,01 s** — o cliente
+recebe outro código, o servidor gasta exatamente o mesmo. Seria trocar o rótulo
+da resposta, não liberar recurso nenhum.
+
+O que de fato limita o trabalho é a entrada, que já é limitada: no máximo 100
+elementos e 100 folhas, medidos em 0,67 s pela rede no pior caso.
+
+---
+
 ## Avaliação de modelo e de contexto (pedido pelo usuário)
 
 > **Escrita no planejamento, revista em 2026-09-06.** As etapas 1–7 citadas

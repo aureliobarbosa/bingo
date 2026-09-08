@@ -15,7 +15,7 @@ decisão.
 
 ```bash
 uv sync                                    # cria o ambiente (baixa o Python 3.14)
-uv run pytest -q                           # 58 testes
+uv run pytest -q                           # 70 testes
 uv run ruff check . && uv run ruff format --check .   # o que o CI cobra
 uv run uvicorn bingo.api:app --reload      # http://127.0.0.1:8000
 scripts/fumaca.sh http://127.0.0.1:8000    # o serviço responde de verdade
@@ -116,6 +116,21 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   uvicorn sobe com `--proxy-headers --forwarded-allow-ips='*'`: sem o
   `X-Forwarded-For`, o limite de taxa por IP da Etapa 8.3 veria todo o tráfego
   como um cliente só.
+- **Limite de taxa por IP**: janela deslizante de 60 s, teto de 120 requisições,
+  dicionário em memória e biblioteca padrão, só nas rotas `/api/` — os estáticos
+  ficam de fora para não gastar a cota de quem só abriu a página. Contém bot em
+  laço, não atacante determinado: cada instância tem o seu dicionário, então com
+  `--max-instances 3` o teto efetivo é até 3x e zera quando a instância recicla.
+- **Cabeçalhos de segurança em toda resposta**, pelo middleware mais externo. A
+  CSP dispensa `unsafe-inline` porque a página não tem script nem `style=`
+  embutido; ela libera só o jsDelivr (CSS do Bootstrap) e `blob:` em `frame-src`
+  e `object-src`, que é como o PDF do preview chega ao `<iframe>`. **Ao mexer no
+  frontend, conferir se a CSP ainda cobre o que a página carrega** — o erro é
+  silencioso.
+- **O timeout de geração é o `--timeout=60s` do Cloud Run.** Um timeout dentro
+  do processo não funciona: as rotas são `def` síncronas numa thread do pool, e
+  cancelar a tarefa não interrompe a thread — medido, 504 saindo em 3,01 s para
+  um trabalho de 3 s com timeout de 0,5 s.
 - **A publicação vive no `.github/workflows/deploy.yml`**, separado do `ci.yml`
   porque o WIF exige `id-token: write` e o `ci.yml` roda em pull request — a
   permissão alcançaria código de terceiros. O `deploy.yml` constrói, testa a
@@ -142,12 +157,11 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
 - **No container de desenvolvimento o ambiente fica em `/opt/venv`**, fora do
   diretório montado: dentro dele o `.venv` do host apareceria por cima, com
   caminhos absolutos que não valem no container.
-- **O navegador guarda `static/` em cache.** `StaticFiles` serve sem versão na URL
-  nem cabeçalho de cache, então depois de editar `app.js` o navegador pode
-  continuar rodando a versão antiga — o que já levou a diagnósticos errados. Ao
-  conferir uma mudança na interface, recarregue ignorando o cache
-  (`Ctrl+Shift+R`) ou use uma janela anônima. A correção definitiva é decisão da
-  Etapa 8.
+- **O navegador guardava `static/` em cache.** Resolvido na Etapa 8.3: a
+  subclasse `EstaticosRevalidados` (em `src/bingo/api.py`) manda
+  `Cache-Control: no-cache` e o ETag fecha a revalidação em 304. A armadilha
+  fica registrada porque a versão velha do `app.js` já levou a diagnósticos
+  errados: se ela reaparecer, confira primeiro se o cabeçalho ainda está lá.
 - **A versão do uv vive em dois lugares**: o `ARG UV_VERSION` do `Dockerfile` e
   o `env.UV_VERSION` de `.github/workflows/ci.yml`. Elas devem andar juntas,
   senão o CI resolve dependências com uma ferramenta diferente da que constrói

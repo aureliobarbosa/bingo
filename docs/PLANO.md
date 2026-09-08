@@ -1,9 +1,9 @@
 # Bingo — o que falta fazer
 
-> **Andamento** — Etapas 0 a 8.2 concluídas: o serviço está publicado em
-> `https://bingo-286308093839.southamerica-east1.run.app` e cada push em `main`
-> implanta sozinho. Restam a 8.3 (limite de taxa e cache), a 9 (arquivo de
-> configuração) e a 10 (documentação).
+> **Andamento** — Etapa 8 concluída: o serviço está publicado em
+> `https://bingo-286308093839.southamerica-east1.run.app`, cada push em `main`
+> implanta sozinho e as proteções que substituem a autenticação estão todas no
+> lugar. Restam a 9 (arquivo de configuração) e a 10 (documentação).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
 ao mexer numa área pronta; não é preciso lê-lo inteiro para começar uma etapa. O
@@ -31,27 +31,26 @@ que foi medido no container (47 MB de memória, 0,38 s para gerar 100 folhas), o
 dimensionamento é trivial: um único processo `uvicorn` atende com folga de várias
 ordens de grandeza.
 
-### 8.3 Limite de taxa, cache e cabeçalhos
+### 8.3 Limite de taxa, cache e cabeçalhos — **concluída**
 
-Os limites de tamanho já foram resolvidos na 6.2.
+Feito nos três commits previstos, com os testes junto (70 no total). O porquê de
+cada escolha está em [DECISOES.md](DECISOES.md); em uma linha cada:
 
-- **Limite de taxa por IP** — middleware com dicionário em memória e biblioteca
-  padrão, seguindo a convenção do projeto. Com `--max-instances 3` o limite
-  efetivo é até 3× o configurado e zera quando a instância recicla: serve para
-  conter bot em laço, não atacante determinado. Registrar a limitação junto do
-  código.
-- **Cache dos estáticos** — subclasse de `StaticFiles` enviando
-  `Cache-Control: no-cache`, que força revalidação (o ETag resolve em 304).
-  Elimina a armadilha do `app.js` velho sem introduzir versão na URL, que
-  exigiria o build step que o projeto não tem. Com ~10 usuários por ano,
-  revalidar não custa nada.
-- **Cabeçalhos de segurança e timeout de geração.** CORS segue desnecessário:
-  frontend e API são a mesma origem.
-- **nginx está descartado** — ver o motivo em [DECISOES.md](DECISOES.md).
+- **Limite de taxa por IP** — janela deslizante de 60 s com teto de 120
+  requisições, dicionário em memória e biblioteca padrão, só nas rotas `/api/`.
+- **Cache dos estáticos** — `EstaticosRevalidados` manda
+  `Cache-Control: no-cache`; o ETag resolve a revalidação em 304.
+- **Cabeçalhos de segurança** — CSP sem `unsafe-inline`, mais `nosniff`,
+  `X-Frame-Options`, `Referrer-Policy` e `Permissions-Policy`.
+- **O timeout de geração já existia** — é o `--timeout=60s` do Cloud Run. Um
+  timeout dentro do processo foi medido e descartado: com rotas síncronas na
+  thread do pool, ele troca o código da resposta sem liberar recurso nenhum.
 
-Commits: `chore: limite de taxa por IP`,
-`chore: cache dos estáticos`,
-`chore: cabeçalhos de segurança`.
+**Falta uma conferência que este ambiente não faz**: abrir a página num
+navegador de verdade e ver o preview aparecer sob a CSP nova. Não há Chrome
+instalado aqui, e a CSP é o único item da 8.3 cujo erro seria silencioso — o
+`<iframe>` do preview ficaria em branco. A política libera `blob:` em
+`frame-src` e em `object-src` justamente por isso.
 
 ---
 
