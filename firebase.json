@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "bingo",
+    "site": "teacher-bingol",
     "public": "hosting/publico",
     "ignore": [
       "firebase.json",

@@ -4,7 +4,7 @@
 > `https://bingo-286308093839.southamerica-east1.run.app`, cada push em `main`
 > implanta sozinho e as proteções que substituem a autenticação estão todas no
 > lugar. A Etapa 8.4 dá a ele um endereço que dá para ditar
-> (`bingo.web.app`) e **falta apenas rodar os comandos do Firebase**, que
+> (`teacher-bingol.web.app`) e **falta apenas rodar os comandos do Firebase**, que
 > exigem login do usuário. Restam a 9 (arquivo de configuração) e a 10
 > (documentação).
 
@@ -57,8 +57,8 @@ Como isso foi lido está em [DECISOES.md](DECISOES.md).
 
 O domain mapping nativo do Cloud Run não vale em `southamerica-east1`, e um
 balanceador custaria ~US$ 18/mês. O caminho é o **Firebase Hosting**, que aceita
-rewrite para Cloud Run nesta região e dá `bingo.web.app` de graça, com HTTPS. O
-porquê de cada alternativa recusada está em [DECISOES.md](DECISOES.md).
+rewrite para Cloud Run nesta região e dá `teacher-bingol.web.app` de graça, com
+HTTPS. O porquê de cada alternativa recusada está em [DECISOES.md](DECISOES.md).
 
 Já feito e commitado:
 
@@ -74,7 +74,7 @@ diretório atual. Nada a instalar — o container já traz Node 22 com `npx`, e
 ```bash
 npx firebase-tools login --no-localhost
 npx firebase-tools projects:addfirebase bingol-508013     # habilita o Firebase no projeto que já existe
-npx firebase-tools hosting:sites:create bingo --project bingol-508013
+npx firebase-tools hosting:sites:create teacher-bingol --project bingol-508013
 npx firebase-tools deploy --only hosting
 ```
 
@@ -85,13 +85,14 @@ URL para abrir no navegador da máquina e espera o código colado de volta. A
 credencial fica em `/root/.config/`, que não é montado do host: se o container
 for recriado, é refazer o login.
 
-O nome `bingo` respondia "Site Not Found" na conferência, o que indica livre; se
-o `sites:create` recusar, escolher outro e trocar o campo `site` do
-`firebase.json`. Depois:
+Os nomes `bingo` e `teacher-bingo` estavam **reservados** — a sondagem por HTTP
+("Site Not Found") diz que ninguém publicou ali, não que o id esteja livre. Quem
+decide é o `sites:create`, e o que ele aceitou foi `teacher-bingol`. Ao trocar de
+nome, trocar junto o campo `site` do `firebase.json`. Depois:
 
 ```bash
-scripts/fumaca.sh https://bingo.web.app     # o mesmo teste de fumaça, no endereço novo
-curl -sI https://bingo.web.app/             # os cabeçalhos de segurança atravessaram a CDN?
+scripts/fumaca.sh https://teacher-bingol.web.app     # o mesmo teste de fumaça, no endereço novo
+curl -sI https://teacher-bingol.web.app/             # os cabeçalhos de segurança atravessaram a CDN?
 ```
 
 E no **Firefox**, pelo endereço novo: gerar preview, conferir que o `<iframe>`

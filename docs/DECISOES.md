@@ -1115,6 +1115,41 @@ nele muda a cada push: uma publicação só, à mão, e o `deploy.yml` continua 
 papel novo no WIF. Automatizá-lo custaria um papel de Firebase Hosting Admin na
 conta de deploy para algo que praticamente não muda.
 
+### O 403 do `addfirebase` era aceitação de termos, não permissão
+
+Ligar o Firebase num projeto do Cloud que já existe custou mais que o resto da
+etapa, e o diagnóstico vale registrado porque a mensagem do Google engana:
+`projects:addfirebase` devolveu **403 "The caller does not have permission"** em
+todas as tentativas. A conta era `roles/owner` na política do projeto, conferido
+por `getIamPolicy`, e nada disso era o problema.
+
+A eliminação, na ordem em que foi feita:
+
+1. **API desligada** — `firebase.googleapis.com` e `firebasehosting.googleapis.com`
+   estavam `DISABLED`. Isso de fato produz 403 com essa mesma mensagem, mas
+   ligá-las não resolveu.
+2. **IAM** — `testIamPermissions` devolveu `firebase.projects.update` concedida,
+   e `getIamPolicy` mostrou `roles/owner`. Descartado.
+3. **Organização ou pasta com política** — `getAncestry` mostrou o projeto sem
+   pai nenhum. Descartado.
+4. **Projeto de cota** — repetir a chamada com `x-goog-user-project` não mudou
+   nada. Descartado.
+
+O que sobrou, e era: **a conta nunca tinha usado o Firebase e não aceitara os
+termos de serviço**, que só existem na interface. O sinal que apontou para lá:
+`GET /v1beta1/availableProjects` respondia **200 listando o projeto** enquanto o
+`POST :addFirebase` dava 403 — leitura liberada e escrita negada com Owner
+comprovado não é IAM, é gate de conta. E o console do Firebase não listava o
+projeto para importar justamente porque é esse endpoint que alimenta a lista.
+
+A saída foi criar um projeto qualquer pelo console (o fluxo de criação apresenta
+os termos), e então o `addfirebase` no projeto de verdade passou na primeira
+tentativa. O projeto criado só para aceitar termos pode ser apagado.
+
+**Se isto reaparecer noutro projeto**: não procure papel faltando. Compare
+`availableProjects` com `addFirebase`; se um responde e o outro não, é termo, e
+o caminho é o console.
+
 ### Sem HSTS, pelo mesmo motivo de antes
 
 `web.app`, como `run.app`, já vem na lista de pré-carga dos navegadores, então
