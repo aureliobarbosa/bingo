@@ -146,6 +146,13 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   estiver vazia. Nenhuma chave existe: o WIF troca o token OIDC do GitHub por
   credencial temporária, e `scripts/configura-gcp.sh` recria tudo do lado do
   Google. O serviço roda como `bingo-runtime`, conta **sem papel nenhum**.
+- **O endereço público sai do Firebase Hosting** (`bingo.web.app`, grátis, com
+  HTTPS): o domain mapping nativo do Cloud Run está em preview e não vale em
+  `southamerica-east1`, e um balanceador custaria ~US$ 18/mês para três
+  requisições por dia. O `firebase.json` manda `**` ao serviço e o `public` fica
+  vazio de propósito — estático copiado para lá seria servido *antes* do
+  rewrite. O deploy do Hosting é manual, de uma vez; o `run.app` continua
+  público.
 
 ## Armadilhas já encontradas
 
@@ -209,6 +216,10 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   preto nos screenshots mesmo com tudo funcionando. Verifique pelo DOM
   (`preview.src` começa com `blob:`). **Firefox headless não roda neste ambiente**
   (trava até o timeout, inclusive em `about:blank`).
+- **Atrás do Firebase Hosting o IP do cliente vem em `Fastly-Client-Ip`.** Quem
+  fala com o Cloud Run é a CDN, então o `request.client` seria o mesmo para todo
+  mundo e o limite de taxa viraria um teto global. `_cliente()` (em
+  `src/bingo/api.py`) lê o cabeçalho primeiro e só depois cai para a conexão.
 
 ## Desempenho medido
 

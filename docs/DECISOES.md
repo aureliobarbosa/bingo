@@ -1048,6 +1048,86 @@ elementos e 100 folhas, medidos em 0,67 s pela rede no pior caso.
 
 ---
 
+## Etapa 8.4 — Um endereço que dá para ditar
+
+`bingo-286308093839.southamerica-east1.run.app` funciona, mas ninguém dita isso
+para um professor no corredor. A pergunta que abriu a etapa foi se o Google dá
+um domínio de graça.
+
+### Não existe domínio grátis do Google, mas existe subdomínio
+
+O Google Domains foi vendido à Squarespace em 2023; o **Cloud Domains** que
+sobrou é registrador pago, ~US$ 12/ano num `.com`. Registro de domínio grátis
+não há.
+
+O **Firebase Hosting**, porém, dá `<nome>.web.app` sem custo, com HTTPS,
+certificado gerenciado e CDN — e aceita *rewrite* para um serviço do Cloud Run.
+É o mais perto de "domínio grátis do Google" que existe, e é a opção que a
+própria documentação do Cloud Run recomenda como a de baixo custo.
+
+### Por que não o domain mapping nativo do Cloud Run
+
+Ele existe e seria o caminho óbvio, mas **continua em preview e só vale em dez
+regiões** — `asia-east1`, `europe-west1`, `us-central1` e afins. A nossa,
+`southamerica-east1`, não está na lista. Usá-lo exigiria mudar o serviço de
+região, o que piora a latência de quem vai usar (professores no Brasil) e ainda
+adota uma feature que o próprio Google marca como não pronta para produção.
+
+O balanceador de carga externo global resolveria tudo e dá controle total, mas
+a regra de encaminhamento custa ~US$ 18/mês, para um serviço que atende três
+requisições por dia. Cloudflare de graça na frente também não serve direto: o
+`run.app` roteia pelo cabeçalho `Host`, então exigiria um Worker reescrevendo-o
+— mais peça móvel do que o problema merece.
+
+### O `public` fica vazio de propósito
+
+O `firebase.json` exige a chave `public` mesmo sem estático nenhum, e o rewrite
+`**` manda toda requisição ao Cloud Run. A tentação é copiar `static/` para
+dentro do `public` e deixar a CDN servir — e é armadilha: **o Hosting resolve
+arquivo estático antes de aplicar o rewrite**, então a cópia passaria por cima
+do que o serviço entrega e as duas divergiriam no primeiro `app.js` alterado.
+O `RAIZ_PROJETO` continua sendo a única fonte, com o `no-cache` e o ETag da
+Etapa 8.3 valendo como antes. A CDN não guarda nada por conta própria: ela só
+cacheia resposta com `Cache-Control` público, e o PDF é `POST`.
+
+### O IP do cliente muda de cabeçalho atrás da CDN
+
+Essa é a única consequência que exigiu código. Pelo `run.app` direto, o
+`--proxy-headers` da Etapa 8.2 faz o `request.client` já ser o visitante. Atrás
+do Hosting, não: quem fala com o Cloud Run é a CDN (Fastly), e o IP real vem em
+**`Fastly-Client-Ip`**. Sem lê-lo, o limite de taxa da 8.3 deixaria de contar
+por cliente e viraria um teto global — um usuário sozinho gastaria a cota de
+todos. `_cliente()` passa a preferir o cabeçalho e só cai para o
+`request.client` quando ele falta.
+
+O cabeçalho é forjável por quem chame o `run.app` direto. Não é porta nova: é a
+mesma exposição que o `--forwarded-allow-ips='*'` já aceitou com o
+`X-Forwarded-For`, e a régua continua sendo conter bot em laço.
+
+### O `run.app` continua público, e o deploy do Hosting é manual
+
+O Hosting é uma porta a mais, não um muro: o endereço antigo segue respondendo.
+Fechá-lo exigiria ingress interno mais balanceador — exatamente o custo recusado
+acima.
+
+O `firebase.json` aponta para o *serviço*, não para uma versão dele, então nada
+nele muda a cada push: uma publicação só, à mão, e o `deploy.yml` continua sem
+papel novo no WIF. Automatizá-lo custaria um papel de Firebase Hosting Admin na
+conta de deploy para algo que praticamente não muda.
+
+### Sem HSTS, pelo mesmo motivo de antes
+
+`web.app`, como `run.app`, já vem na lista de pré-carga dos navegadores, então
+`Strict-Transport-Security` continua ausente sem prejuízo. **O gatilho para
+acrescentá-lo é registrar um domínio próprio** (`.com.br`, `.com`): aí o
+cabeçalho passa a valer de verdade. Se esse dia chegar, os preços de custo
+levantados aqui foram R$ 40/ano no Registro.br para `.com.br` e ~US$ 9,77/ano na
+Cloudflare Registrar para `.com`; o domínio aponta para o mesmo Firebase
+Hosting, com verificação por TXT e registros A, sem refazer nada do que está
+acima.
+
+---
+
 ## Avaliação de modelo e de contexto (pedido pelo usuário)
 
 > **Escrita no planejamento, revista em 2026-09-06.** As etapas 1–7 citadas

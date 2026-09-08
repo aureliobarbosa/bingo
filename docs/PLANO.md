@@ -3,7 +3,10 @@
 > **Andamento** — Etapa 8 concluída: o serviço está publicado em
 > `https://bingo-286308093839.southamerica-east1.run.app`, cada push em `main`
 > implanta sozinho e as proteções que substituem a autenticação estão todas no
-> lugar. Restam a 9 (arquivo de configuração) e a 10 (documentação).
+> lugar. A Etapa 8.4 dá a ele um endereço que dá para ditar
+> (`bingo.web.app`) e **falta apenas rodar os comandos do Firebase**, que
+> exigem login do usuário. Restam a 9 (arquivo de configuração) e a 10
+> (documentação).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
 ao mexer numa área pronta; não é preciso lê-lo inteiro para começar uma etapa. O
@@ -49,6 +52,43 @@ cada escolha está em [DECISOES.md](DECISOES.md); em uma linha cada:
 A CSP era o único item cujo erro seria silencioso, e ela foi conferida no
 Firefox pelo usuário: o preview aparece e o console não traz violação nenhuma.
 Como isso foi lido está em [DECISOES.md](DECISOES.md).
+
+### 8.4 Endereço público — **falta a publicação**
+
+O domain mapping nativo do Cloud Run não vale em `southamerica-east1`, e um
+balanceador custaria ~US$ 18/mês. O caminho é o **Firebase Hosting**, que aceita
+rewrite para Cloud Run nesta região e dá `bingo.web.app` de graça, com HTTPS. O
+porquê de cada alternativa recusada está em [DECISOES.md](DECISOES.md).
+
+Já feito e commitado:
+
+- `_cliente()` lê `Fastly-Client-Ip`, senão o limite de taxa veria a CDN inteira
+  como um cliente só (com dois testes; 72 no total).
+- `firebase.json`, `.firebaserc` e o `hosting/publico/` vazio de propósito.
+
+**Falta rodar** — exige login interativo, então é do usuário:
+
+```bash
+npx firebase-tools login --no-localhost
+npx firebase-tools projects:addfirebase bingol-508013     # habilita o Firebase no projeto que já existe
+npx firebase-tools hosting:sites:create bingo --project bingol-508013
+npx firebase-tools deploy --only hosting
+```
+
+O nome `bingo` respondia "Site Not Found" na conferência, o que indica livre; se
+o `sites:create` recusar, escolher outro e trocar o campo `site` do
+`firebase.json`. Depois:
+
+```bash
+scripts/fumaca.sh https://bingo.web.app     # o mesmo teste de fumaça, no endereço novo
+curl -sI https://bingo.web.app/             # os cabeçalhos de segurança atravessaram a CDN?
+```
+
+E no **Firefox**, pelo endereço novo: gerar preview, conferir que o `<iframe>`
+mostra a folha e que o console não traz violação de CSP — o erro é silencioso e
+só um navegador de verdade responde.
+
+---
 
 ---
 
