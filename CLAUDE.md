@@ -146,7 +146,7 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   estiver vazia. Nenhuma chave existe: o WIF troca o token OIDC do GitHub por
   credencial temporária, e `scripts/configura-gcp.sh` recria tudo do lado do
   Google. O serviço roda como `bingo-runtime`, conta **sem papel nenhum**.
-- **O endereço público sai do Firebase Hosting** (`teacher-bingol.web.app`, grátis, com
+- **O endereço público sai do Firebase Hosting** (`bingo410.web.app`, grátis, com
   HTTPS): o domain mapping nativo do Cloud Run está em preview e não vale em
   `southamerica-east1`, e um balanceador custaria ~US$ 18/mês para três
   requisições por dia. O `firebase.json` manda `**` ao serviço e o `public` fica
@@ -228,7 +228,7 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   destrava. O diagnóstico inteiro está em `docs/DECISOES.md`.
 - **Nome de site do Hosting: só o `sites:create` decide.** `bingo` e
   `teacher-bingo` respondiam "Site Not Found" por HTTP e mesmo assim estavam
-  reservados; o que valeu foi `teacher-bingol`.
+  reservados; o que valeu foi `bingo410`.
 
 ## Desempenho medido
 

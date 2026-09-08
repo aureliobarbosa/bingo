@@ -1153,7 +1153,11 @@ o caminho é o console.
 ### Sem HSTS, pelo mesmo motivo de antes
 
 `web.app`, como `run.app`, já vem na lista de pré-carga dos navegadores, então
-`Strict-Transport-Security` continua ausente sem prejuízo. **O gatilho para
+`Strict-Transport-Security` continua ausente do serviço sem prejuízo — e a
+medição do endereço publicado mostrou mais: **o próprio Hosting carimba o
+cabeçalho** (`max-age=31556926; includeSubDomains; preload`), sem ninguém pedir.
+Pelo `run.app` direto ele não vem, e continua não fazendo falta pelo mesmo
+motivo de sempre. **O gatilho para
 acrescentá-lo é registrar um domínio próprio** (`.com.br`, `.com`): aí o
 cabeçalho passa a valer de verdade. Se esse dia chegar, os preços de custo
 levantados aqui foram R$ 40/ano no Registro.br para `.com.br` e ~US$ 9,77/ano na
