@@ -219,3 +219,25 @@ def test_o_limite_de_taxa_nao_alcanca_a_pagina_nem_os_estaticos(monkeypatch):
     # Quem estourou a cota de gerar PDF continua conseguindo abrir a página.
     assert client.get("/").status_code == 200
     assert client.get("/static/app.js").status_code == 200
+
+
+def test_estaticos_pedem_revalidacao():
+    r = client.get("/static/app.js")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "no-cache"
+    assert r.headers["etag"]
+
+
+def test_estatico_sem_mudanca_volta_304_e_segue_pedindo_revalidacao():
+    """O `no-cache` só é barato porque a revalidação cabe num 304 sem corpo."""
+    etag = client.get("/static/app.js").headers["etag"]
+
+    r = client.get("/static/app.js", headers={"If-None-Match": etag})
+    assert r.status_code == 304
+    assert r.headers["cache-control"] == "no-cache"
+    assert r.content == b""
+
+
+def test_index_tambem_pede_revalidacao():
+    r = client.get("/")
+    assert r.headers["cache-control"] == "no-cache"

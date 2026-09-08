@@ -209,9 +209,29 @@ def jogo(entrada: ConfiguracaoIn) -> Response:
     )
 
 
+class EstaticosRevalidados(StaticFiles):
+    """`StaticFiles` que manda `Cache-Control: no-cache`.
+
+    `no-cache` não é "não guarde": é "guarde, mas pergunte antes de usar". O
+    `ETag` que o `FileResponse` já monta faz a pergunta caber num 304 sem
+    corpo. Isso fecha a armadilha de o navegador seguir rodando um `app.js`
+    velho depois de uma edição — que já custou diagnósticos errados — sem
+    exigir versão na URL, que pediria o build step que o projeto não tem. Com
+    uma dezena de usuários por ano, revalidar não custa nada.
+    """
+
+    def file_response(self, *args, **kwargs) -> Response:
+        resposta = super().file_response(*args, **kwargs)
+        resposta.headers["Cache-Control"] = "no-cache"
+        return resposta
+
+
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
+    # Mesma revalidação dos estáticos. Aqui sem 304: a rota não confere o
+    # `If-None-Match`, e reenviar um index.html de poucos KB não paga o código
+    # que faria isso.
+    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
-app.mount("/static", StaticFiles(directory=STATIC), name="static")
+app.mount("/static", EstaticosRevalidados(directory=STATIC), name="static")
