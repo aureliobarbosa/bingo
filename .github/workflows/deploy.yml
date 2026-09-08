@@ -1,0 +1,142 @@
+# Publicação no Cloud Run.
+#
+# Arquivo separado do ci.yml por PERMISSÃO, não por estética: o WIF exige
+# `id-token: write`, e num arquivo só essa permissão alcançaria os jobs que
+# executam código de pull request — qualquer PR poderia trocar o token por
+# acesso ao projeto no Google. Aqui o gatilho é só push em main.
+#
+# A sequência é construir → fumaça → push → implantar por digest, tudo no mesmo
+# job. É o que faz valer a decisão de "construir uma vez e promover": o que é
+# implantado é literalmente o binário que passou no teste, e não uma imagem
+# reconstruída depois. O ci.yml continua sem credencial nenhuma, validando PRs.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  # Permite reimplantar sem um commit novo — útil para rollback manual.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+# Deploy não se cancela no meio: dois pushes seguidos implantam em ordem.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+env:
+  REGIAO: southamerica-east1
+  REPOSITORIO: bingo
+  SERVICO: bingo
+
+jobs:
+  publicar:
+    name: Publicar no Cloud Run
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Enquanto o lado do Google não existir, o job é pulado em vez de falhar:
+    # sem isto todo push em main ficaria vermelho até a configuração terminar.
+    # Basta cadastrar as Variables no repositório para ele passar a rodar.
+    if: vars.GCP_WIF_PROVIDER != ''
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Construída e carregada localmente: o teste de fumaça roda antes de a
+      # imagem sair da máquina. Só depois ela é empurrada, com as mesmas
+      # camadas — nada é reconstruído entre o teste e a publicação.
+      - name: Construir o estágio de produção
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: producao
+          load: true
+          tags: bingo:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # PORT=8080 é o que o Cloud Run injeta. Testar na porta real evita
+      # descobrir só em produção que a expansão de ${PORT} não funcionou.
+      - name: Subir o container na porta do Cloud Run
+        run: |
+          docker run --detach --name bingo --env PORT=8080 \
+            --publish 8080:8080 bingo:${{ github.sha }}
+
+      - name: Teste de fumaça no container
+        run: ./scripts/fumaca.sh http://127.0.0.1:8080
+
+      - name: Parar o container
+        run: docker rm --force bingo
+
+      # Sem chave de conta de serviço: o GitHub apresenta um token OIDC de
+      # curta duração e o Google o troca por credencial temporária. Quem
+      # autoriza é a condição do provedor, presa a este repositório.
+      - name: Autenticar no Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_SA_DEPLOY }}
+          # O login no registro precisa de um token de acesso de verdade.
+          token_format: access_token
+
+      - name: Entrar no Artifact Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGIAO }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      # O digest é lido de volta do registro depois do push: é o identificador
+      # imutável daquele conteúdo exato. A tag serve para humanos lerem o
+      # histórico; ela pode ser reescrita, o digest não.
+      - name: Publicar a imagem e ler o digest
+        id: imagem
+        run: |
+          set -euo pipefail
+          CAMINHO="${REGIAO}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${REPOSITORIO}/bingo"
+          docker tag "bingo:${{ github.sha }}" "${CAMINHO}:${{ github.sha }}"
+          docker push "${CAMINHO}:${{ github.sha }}"
+          REFERENCIA=$(docker image inspect --format '{{index .RepoDigests 0}}' \
+            "${CAMINHO}:${{ github.sha }}")
+          echo "referencia=${REFERENCIA}" >> "${GITHUB_OUTPUT}"
+          echo "Implantando ${REFERENCIA}"
+
+      # As salvaguardas saem do que foi medido no container (47 MB de memória,
+      # 0,38 s para gerar 100 folhas) e do volume previsto, de cerca de três
+      # requisições por dia. O teto de instâncias é o que limita a exposição
+      # financeira de um serviço aberto; o orçamento apenas avisa.
+      #
+      # A identidade de execução é uma conta sem papel nenhum: o serviço é
+      # stateless e não chama nada do Google. A conta padrão do Compute Engine,
+      # que o Cloud Run usaria, costuma vir com poder de Editor.
+      - name: Implantar no Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v3
+        with:
+          service: ${{ env.SERVICO }}
+          region: ${{ env.REGIAO }}
+          image: ${{ steps.imagem.outputs.referencia }}
+          flags: >-
+            --allow-unauthenticated
+            --service-account=${{ vars.GCP_SA_RUNTIME }}
+            --memory=256Mi
+            --cpu=1
+            --min-instances=0
+            --max-instances=3
+            --timeout=60s
+
+      # Construir e implantar não provam que o serviço responde. Este é o mesmo
+      # teste de fumaça, agora contra a URL pública de verdade.
+      - name: Teste de fumaça na URL pública
+        run: ./scripts/fumaca.sh "${{ steps.deploy.outputs.url }}"
+
+      - name: Registro do container, se a fumaça local falhar
+        if: failure()
+        run: docker logs bingo || true

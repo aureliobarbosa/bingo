@@ -1,0 +1,12 @@
+[
+  {
+    "name": "manter-as-dez-ultimas",
+    "action": { "type": "Keep" },
+    "mostRecentVersions": { "keepCount": 10 }
+  },
+  {
+    "name": "apagar-o-resto-depois-de-30-dias",
+    "action": { "type": "Delete" },
+    "condition": { "olderThan": "30d" }
+  }
+]
