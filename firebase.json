@@ -1,0 +1,20 @@
+{
+  "hosting": {
+    "site": "bingo",
+    "public": "hosting/publico",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "LEIA-ME.md"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "bingo",
+          "region": "southamerica-east1"
+        }
+      }
+    ]
+  }
+}

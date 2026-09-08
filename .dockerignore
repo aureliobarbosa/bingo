@@ -9,3 +9,6 @@ build
 *.pdf
 .devcontainer
 docs
+firebase.json
+.firebaserc
+hosting
