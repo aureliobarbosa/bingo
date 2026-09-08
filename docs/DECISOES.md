@@ -1150,6 +1150,23 @@ tentativa. O projeto criado só para aceitar termos pode ser apagado.
 `availableProjects` com `addFirebase`; se um responde e o outro não, é termo, e
 o caminho é o console.
 
+### Como foi verificado, e o que a CDN não estragou
+
+`scripts/fumaca.sh https://bingo410.web.app` passou nos quatro testes pelo
+endereço publicado — página, estáticos, preview e jogo completo, com PDF de
+verdade nos dois últimos (47 KB e 49 KB). O mesmo script que roda no CI contra o
+container serve aqui sem uma linha de mudança, que era a ideia dele desde a 8.2.
+
+Os cabeçalhos foram conferidos no endereço novo, porque um proxy no meio é
+exatamente o lugar onde eles se perdem: CSP, `nosniff`, `X-Frame-Options`,
+`Referrer-Policy` e `Permissions-Policy` chegam **inteiros**, e o `no-cache` com
+ETag dos estáticos também. A CDN não reescreveu nada e não guardou nada por
+conta própria.
+
+Falta a conferência da CSP no Firefox pelo endereço novo. A da 8.3 vale como
+indício forte — mesma origem, mesmo `blob:` —, mas quem obedece à CSP é o
+navegador, e o erro é silencioso.
+
 ### Sem HSTS, pelo mesmo motivo de antes
 
 `web.app`, como `run.app`, já vem na lista de pré-carga dos navegadores, então

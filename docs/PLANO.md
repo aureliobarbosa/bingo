@@ -3,10 +3,9 @@
 > **Andamento** — Etapa 8 concluída: o serviço está publicado em
 > `https://bingo-286308093839.southamerica-east1.run.app`, cada push em `main`
 > implanta sozinho e as proteções que substituem a autenticação estão todas no
-> lugar. A Etapa 8.4 dá a ele um endereço que dá para ditar
-> (`bingo410.web.app`) e **falta apenas rodar os comandos do Firebase**, que
-> exigem login do usuário. Restam a 9 (arquivo de configuração) e a 10
-> (documentação).
+> lugar. A Etapa 8.4 fechou o endereço público: o serviço atende em
+> **https://bingo410.web.app**, pelo Firebase Hosting. Restam a 9 (arquivo de
+> configuração) e a 10 (documentação).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
 ao mexer numa área pronta; não é preciso lê-lo inteiro para começar uma etapa. O
@@ -53,53 +52,51 @@ A CSP era o único item cujo erro seria silencioso, e ela foi conferida no
 Firefox pelo usuário: o preview aparece e o console não traz violação nenhuma.
 Como isso foi lido está em [DECISOES.md](DECISOES.md).
 
-### 8.4 Endereço público — **falta a publicação**
+### 8.4 Endereço público — **concluída**
 
-O domain mapping nativo do Cloud Run não vale em `southamerica-east1`, e um
-balanceador custaria ~US$ 18/mês. O caminho é o **Firebase Hosting**, que aceita
-rewrite para Cloud Run nesta região e dá `bingo410.web.app` de graça, com
-HTTPS. O porquê de cada alternativa recusada está em [DECISOES.md](DECISOES.md).
+O serviço atende em **https://bingo410.web.app** (o 410 é a quadra da escola da
+primeira professora que usa o gerador). O domain mapping nativo do Cloud Run não
+vale em `southamerica-east1` e um balanceador custaria ~US$ 18/mês; o **Firebase
+Hosting** aceita rewrite para Cloud Run nesta região e dá o subdomínio com HTTPS
+de graça. O porquê de cada alternativa recusada está em [DECISOES.md](DECISOES.md).
 
-Já feito e commitado:
+No repositório: `firebase.json` (rewrite `**` para o serviço, `public` vazio de
+propósito), `.firebaserc`, e `_cliente()` lendo `Fastly-Client-Ip` — sem isso o
+limite de taxa veria a CDN inteira como um cliente só. 72 testes.
 
-- `_cliente()` lê `Fastly-Client-Ip`, senão o limite de taxa veria a CDN inteira
-  como um cliente só (com dois testes; 72 no total).
-- `firebase.json`, `.firebaserc` e o `hosting/publico/` vazio de propósito.
-
-**Falta rodar** — exige login interativo, então é do usuário. **Dentro do
-container, em `/app`**: é lá que o `firebase.json` está, e o `deploy` o lê do
-diretório atual. Nada a instalar — o container já traz Node 22 com `npx`, e
-`npx --yes firebase-tools@latest` baixa a CLI na hora (testado: 15.29.0).
-
-```bash
-npx firebase-tools login --no-localhost
-npx firebase-tools projects:addfirebase bingol-508013     # habilita o Firebase no projeto que já existe
-npx firebase-tools hosting:sites:create bingo410 --project bingol-508013
-npx firebase-tools deploy --only hosting
-```
-
-O `--no-localhost` não é detalhe: sem ele a CLI sobe um servidor em
-`localhost:9005` *dentro do container* e manda o navegador da máquina ir lá —
-a mesma armadilha do `--host 0.0.0.0` do uvicorn. Com ele, a CLI imprime uma
-URL para abrir no navegador da máquina e espera o código colado de volta. A
-credencial fica em `/root/.config/`, que não é montado do host: se o container
-for recriado, é refazer o login.
-
-Os nomes `bingo` e `teacher-bingo` estavam **reservados** — a sondagem por HTTP
-("Site Not Found") diz que ninguém publicou ali, não que o id esteja livre. Quem
-decide é o `sites:create`, e o que ele aceitou foi `bingo410`. Ao trocar de
-nome, trocar junto o campo `site` do `firebase.json`. Depois:
+**A configuração do lado do Google é manual e de uma vez só**, por decisão: o
+`firebase.json` aponta para o *serviço*, não para uma versão dele, então nada
+muda a cada push. O `deploy.yml` continua sem papel novo no WIF, e não há
+segundo script a manter ao lado do `configura-gcp.sh`. Quem repetir isto noutro
+projeto roda, **dentro do container, em `/app`** (é onde o `firebase.json` está,
+e o `deploy` o lê do diretório atual; nada a instalar, o container já traz Node
+22 com `npx`):
 
 ```bash
-scripts/fumaca.sh https://bingo410.web.app     # o mesmo teste de fumaça, no endereço novo
-curl -sI https://bingo410.web.app/             # os cabeçalhos de segurança atravessaram a CDN?
+npx --yes firebase-tools@latest login --no-localhost
+npx --yes firebase-tools@latest projects:addfirebase bingol-508013
+npx --yes firebase-tools@latest hosting:sites:create bingo410 --project bingol-508013
+npx --yes firebase-tools@latest deploy --only hosting
 ```
 
-E no **Firefox**, pelo endereço novo: gerar preview, conferir que o `<iframe>`
-mostra a folha e que o console não traz violação de CSP — o erro é silencioso e
-só um navegador de verdade responde.
+Três coisas que custaram tempo e que o comando acima esconde:
 
----
+- **`--no-localhost` não é detalhe.** Sem ele a CLI sobe um servidor em
+  `localhost:9005` *dentro do container* e manda o navegador da máquina ir lá —
+  a mesma armadilha do `--host 0.0.0.0` do uvicorn. A credencial fica em
+  `/root/.config/`, que não é montado do host: container recriado, login refeito.
+- **O `addfirebase` deu 403 três vezes, e não era permissão.** Era a aceitação
+  de termos do Firebase, que só existe na interface; o diagnóstico inteiro está
+  em [DECISOES.md](DECISOES.md).
+- **Nome de site só o `sites:create` decide.** `bingo` e `teacher-bingo`
+  estavam reservados, embora respondessem "Site Not Found" por HTTP. Ao trocar
+  de nome, trocar junto o campo `site` do `firebase.json` — o `deploy` falha com
+  "could not find site" se os dois discordarem.
+
+Verificado no endereço publicado: `scripts/fumaca.sh https://bingo410.web.app`
+passou nos quatro testes, e os cabeçalhos de segurança atravessaram a CDN
+inteiros. Falta só a conferência da CSP no **Firefox** pelo endereço novo — o
+erro é silencioso e só um navegador de verdade responde.
 
 ---
 

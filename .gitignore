@@ -20,3 +20,7 @@ wheels/
 
 # AI TOOLS
 .claude/
+
+# Firebase (a CLI escreve os dois no diretório do projeto)
+firebase-debug.log
+.firebase/
