@@ -17,9 +17,14 @@ decisão.
 uv sync                                    # cria o ambiente (baixa o Python 3.14)
 uv run pytest -q                           # 70 testes
 uv run ruff check . && uv run ruff format --check .   # o que o CI cobra
-uv run uvicorn bingo.api:app --reload      # http://127.0.0.1:8000
+uv run uvicorn bingo.api:app --reload --host 0.0.0.0   # http://localhost:8000
 scripts/fumaca.sh http://127.0.0.1:8000    # o serviço responde de verdade
 ```
+
+O `--host 0.0.0.0` é o que faz o servidor ser alcançável **de fora do
+contêiner**, no navegador da máquina. O padrão do uvicorn é `127.0.0.1`, que lá
+dentro significa "só o próprio contêiner". O `fumaca.sh` roda de dentro, então
+para ele o `127.0.0.1` continua valendo.
 
 Em container (mesma receita para os dois ambientes):
 

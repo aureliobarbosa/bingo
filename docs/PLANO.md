@@ -103,7 +103,9 @@ Escrita depois que o container, o servidor e o arquivo de configuração
 estiverem definidos, para descrever o que de fato existe.
 
 `README.md` com: o que é, como rodar localmente
-(`uv run uvicorn bingo.api:app --reload`), como rodar os testes (`uv run pytest`),
+(`uv run uvicorn bingo.api:app --reload --host 0.0.0.0`, com o porquê do
+`--host` para quem trabalha no devcontainer), como rodar os testes
+(`uv run pytest`),
 como construir e executar o container, como está implantado e como usar o
 arquivo de configuração.
 
@@ -115,10 +117,11 @@ Commit: `docs: README com instruções de uso e deploy`.
 
 ```bash
 uv run pytest -q                                    # todos os testes
-uv run uvicorn bingo.api:app --reload               # servidor local
+uv run uvicorn bingo.api:app --reload --host 0.0.0.0   # servidor local
 ```
 
-Depois, no navegador em `http://127.0.0.1:8000`:
+Depois, no navegador em `http://localhost:8000` (o `--host 0.0.0.0` é o que
+deixa o servidor alcançável de fora do contêiner):
 1. Números, 1..75, grade 5×5 com centro livre, 10 folhas → preview mostra 24
    números + centro vazio.
 2. Palavras (colar 30 palavras), grade 4×4, 5 folhas → preview mostra 16 palavras,
