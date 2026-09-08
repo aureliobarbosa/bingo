@@ -87,7 +87,7 @@ jobs:
           token_format: access_token
 
       - name: Entrar no Artifact Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGIAO }}-docker.pkg.dev
           username: oauth2accesstoken
