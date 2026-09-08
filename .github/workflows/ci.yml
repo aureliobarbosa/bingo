@@ -95,12 +95,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Subir o container
+      # As duas portas, porque o CMD tem dois caminhos e os dois importam:
+      # PORT=8080 é o que o Cloud Run injeta em produção, e o padrão de 8000 é
+      # o que vale em `docker run` local. Testar só um deixaria o outro quebrar
+      # em silêncio — a expansão de ${PORT} é uma linha de shell, e ela falha
+      # inteira ou não falha.
+      - name: Subir o container na porta do Cloud Run
         run: |
+          docker run --detach --name bingo --env PORT=8080 \
+            --publish 8080:8080 bingo:${{ github.sha }}
+
+      - name: Teste de fumaça com PORT=8080
+        run: ./scripts/fumaca.sh http://127.0.0.1:8080
+
+      - name: Trocar para a porta padrão
+        run: |
+          docker rm --force bingo
           docker run --detach --name bingo --publish 8000:8000 \
             bingo:${{ github.sha }}
 
-      - name: Teste de fumaça
+      - name: Teste de fumaça na porta padrão
         run: ./scripts/fumaca.sh http://127.0.0.1:8000
 
       # Sem isto, uma falha acima aparece só como "exit 1" sem o traceback.
