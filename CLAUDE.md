@@ -109,6 +109,13 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   universo permite: `combinacoes_possiveis` e `maximo_folhas` em `models.py`. O
   JavaScript refaz a conta saturando o produto em `MAX_FOLHAS`, o que dispensa
   `BigInt`. A regra só morde em universos pequenos.
+- **A porta do contêiner sai da variável `PORT`**, porque o Cloud Run injeta
+  8080 e ignora o `EXPOSE`. Como a forma exec do `CMD` não expande variáveis,
+  ele é forma shell — com `exec`, senão o `sh` fica de PID 1 e engole o
+  `SIGTERM` do encerramento. O `HEALTHCHECK` lê a mesma variável em Python. O
+  uvicorn sobe com `--proxy-headers --forwarded-allow-ips='*'`: sem o
+  `X-Forwarded-For`, o limite de taxa por IP da Etapa 8.3 veria todo o tráfego
+  como um cliente só.
 
 ## Armadilhas já encontradas
 
