@@ -1115,6 +1115,30 @@ nele muda a cada push: uma publicação só, à mão, e o `deploy.yml` continua 
 papel novo no WIF. Automatizá-lo custaria um papel de Firebase Hosting Admin na
 conta de deploy para algo que praticamente não muda.
 
+### Os comandos, e as armadilhas do caminho
+
+Rodados **dentro do container, em `/app`** — é onde o `firebase.json` está, e o
+`deploy` o lê do diretório atual. Nada a instalar: o container já traz Node 22,
+e o `npx` busca a CLI na hora.
+
+```bash
+npx --yes firebase-tools@latest login --no-localhost
+npx --yes firebase-tools@latest projects:addfirebase bingol-508013
+npx --yes firebase-tools@latest hosting:sites:create bingo410 --project bingol-508013
+npx --yes firebase-tools@latest deploy --only hosting
+```
+
+**O `--no-localhost` não é detalhe.** Sem ele a CLI sobe um servidor em
+`localhost:9005` *dentro do container* e manda o navegador da máquina ir lá — a
+mesma armadilha do `--host 0.0.0.0` do uvicorn. Com ele, a CLI imprime uma URL
+para abrir no navegador e espera o código colado de volta. A credencial fica em
+`/root/.config/`, que não é montado do host: container recriado, login refeito.
+
+**Nome de site: só o `sites:create` decide.** `bingo` e `teacher-bingo` estavam
+reservados embora respondessem "Site Not Found" por HTTP — isso diz que ninguém
+publicou ali, não que o id esteja livre. Ao trocar de nome, trocar junto o campo
+`site` do `firebase.json`, senão o `deploy` para com "could not find site".
+
 ### O 403 do `addfirebase` era aceitação de termos, não permissão
 
 Ligar o Firebase num projeto do Cloud que já existe custou mais que o resto da

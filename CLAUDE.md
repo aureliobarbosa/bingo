@@ -50,6 +50,9 @@ paralelos — `testes`, `estatica` e `imagem` — e o último constrói o estág
   no imperativo (`feat:`, `docs:`, `chore:`), explicando o *porquê* no corpo.
 - **Checkpoints**: ao terminar uma etapa do plano, parar e pedir avaliação do
   usuário antes de seguir para a próxima.
+- **Etapa fechada encolhe no plano.** Ao concluir uma etapa, o `PLANO.md` fica
+  com o resumo de uma linha por decisão e um ponteiro; o detalhe — comandos,
+  armadilhas, medições — vai para `DECISOES.md`. O plano é o que *falta* fazer.
 - **Português em tudo**: nomes de funções e variáveis, comentários, mensagens de
   erro e textos da interface.
 - **Biblioteca padrão sempre que possível** no backend. O volume de dados é
@@ -220,7 +223,6 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   fala com o Cloud Run é a CDN, então o `request.client` seria o mesmo para todo
   mundo e o limite de taxa viraria um teto global. `_cliente()` (em
   `src/bingo/api.py`) lê o cabeçalho primeiro e só depois cai para a conexão.
-
 - **403 do `projects:addfirebase` costuma ser aceitação de termos, não papel
   faltando.** Se `GET /v1beta1/availableProjects` responde 200 listando o projeto
   e o `POST :addFirebase` dá 403 com a conta em `roles/owner`, é gate de conta:
