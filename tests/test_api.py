@@ -329,3 +329,13 @@ def test_a_mesma_semente_devolve_o_mesmo_jogo_em_requisicoes_diferentes():
 def test_semente_fora_da_faixa_e_rejeitada_pelo_schema():
     r = client.post("/api/preview", json=CONFIG | {"semente": MAX_SEMENTE + 1})
     assert r.status_code == 422
+
+
+def test_o_arquivo_de_configuracao_e_aceito_como_esta_pelas_rotas():
+    """O arquivo salvo é o objeto que a API já aceita, mais `version` e
+    `logo_nome`. Os campos a mais são ignorados, então ele pode ser reenviado
+    inteiro — se um dia o schema passar a proibir extras, este teste avisa."""
+    arquivo = CONFIG | {"version": 1, "semente": 4242, "logo_nome": "escola.png"}
+    r = client.post("/api/preview", json=arquivo)
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"

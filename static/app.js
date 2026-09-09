@@ -68,6 +68,9 @@ const el = {
   previewVazio: document.getElementById("preview-vazio"),
   btnBaixar: document.getElementById("btn-baixar"),
   btnSortear: document.getElementById("btn-sortear"),
+  btnSalvarConfig: document.getElementById("btn-salvar-config"),
+  btnAbrirConfig: document.getElementById("btn-abrir-config"),
+  arquivoConfig: document.getElementById("arquivo_config"),
   btnTema: document.getElementById("btn-tema"),
   iconeSol: document.getElementById("icone-sol"),
   iconeLua: document.getElementById("icone-lua"),
@@ -84,6 +87,12 @@ const MAX_FOLHAS = 100; // idem, MAX_FOLHAS em models.py
 const MAX_PALAVRA_CARACTERES = 50; // idem, MAX_PALAVRA_CARACTERES em models.py
 const MAX_SEMENTE = 2 ** 32 - 1; // idem, MAX_SEMENTE em models.py
 const ESPERA_LIBERAR_BLOB_MS = 60_000;
+
+/* Versão do arquivo de configuração. Sobe quando o formato mudar de um jeito
+ * que esta página não saiba mais ler; é o que permite recusar com uma mensagem
+ * em vez de aplicar um arquivo pela metade. */
+const VERSAO_CONFIGURACAO = 1;
+const NOME_ARQUIVO_CONFIG = "bingo-configuracao.json";
 
 /* Imagem enviada pelo usuário. Fica só em memória: um data URI de alguns MB
  * estouraria a cota do localStorage e derrubaria o resto da configuração. */
@@ -322,6 +331,19 @@ function sortearNovamente() {
   atualizarPreview();
 }
 
+/* Entrega um blob ao usuário como arquivo. Serve ao PDF e ao arquivo de
+ * configuração — dois botões, um caminho só. */
+function baixarBlob(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = nome;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 async function baixar() {
   const cfg = lerFormulario();
   const problema = validar(cfg);
@@ -334,15 +356,7 @@ async function baixar() {
   el.btnBaixar.disabled = true;
   el.btnBaixar.textContent = "Gerando…";
   try {
-    const blob = await Api.baixarJogo(cfg);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "bingo.pdf";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    baixarBlob(await Api.baixarJogo(cfg), "bingo.pdf");
   } catch (erro) {
     mostrarErro(erro.message);
   } finally {
@@ -371,27 +385,131 @@ function restaurar() {
   try {
     const cfg = JSON.parse(localStorage.getItem(CHAVE_ARMAZENAMENTO) || "null");
     if (!cfg) return;
-
-    el.titulo.value = cfg.titulo ?? el.titulo.value;
-    el.subtitulo.value = cfg.subtitulo ?? "";
-    el.numeroElementos.value = cfg.numero_elementos ?? el.numeroElementos.value;
-    // Mantém a lista de exemplo do HTML quando nada de útil foi salvo.
-    if (Array.isArray(cfg.palavras) && cfg.palavras.length > 0) {
-      el.palavras.value = cfg.palavras.join("\n");
-    }
-    el.linhas.value = cfg.linhas ?? el.linhas.value;
-    el.colunas.value = cfg.colunas ?? el.colunas.value;
-    el.numeroFolhas.value = cfg.numero_folhas ?? el.numeroFolhas.value;
-    // `??` e não `Boolean()`: ausente significa manter o padrão, não desmarcar.
-    el.centroLivre.checked = cfg.centro_livre ?? el.centroLivre.checked;
-    // Semente salva devolve as mesmas cartelas da sessão anterior; ausente ou
-    // estragada, vale a que foi sorteada na carga.
-    if (sementeValida(cfg.semente)) semente = cfg.semente;
-    const radio = document.getElementById(`tipo-${cfg.tipo}`);
-    if (radio) radio.checked = true;
+    aplicarConfiguracao(cfg);
   } catch (erro) {
     // Estado salvo ilegível ou de outro formato: seguir com os padrões do HTML.
     el.form.reset();
+  }
+}
+
+/* Escreve uma configuração nos campos da tela. Vale para os dois caminhos de
+ * volta: o localStorage, que não guarda o logo, e o arquivo, que guarda. Cada
+ * campo ausente mantém o que já estava — assim o arquivo de uma versão mais
+ * velha aplica o que tem e não zera o resto. */
+function aplicarConfiguracao(cfg) {
+  el.titulo.value = cfg.titulo ?? el.titulo.value;
+  el.subtitulo.value = cfg.subtitulo ?? "";
+  el.numeroElementos.value = cfg.numero_elementos ?? el.numeroElementos.value;
+  // Mantém a lista de exemplo do HTML quando nada de útil foi salvo.
+  if (Array.isArray(cfg.palavras) && cfg.palavras.length > 0) {
+    el.palavras.value = cfg.palavras.join("\n");
+  }
+  el.linhas.value = cfg.linhas ?? el.linhas.value;
+  el.colunas.value = cfg.colunas ?? el.colunas.value;
+  el.numeroFolhas.value = cfg.numero_folhas ?? el.numeroFolhas.value;
+  // `??` e não `Boolean()`: ausente significa manter o padrão, não desmarcar.
+  el.centroLivre.checked = cfg.centro_livre ?? el.centroLivre.checked;
+  // Semente salva devolve as mesmas cartelas da sessão anterior; ausente ou
+  // estragada, vale a que foi sorteada na carga.
+  if (sementeValida(cfg.semente)) semente = cfg.semente;
+  const radio = document.getElementById(`tipo-${cfg.tipo}`);
+  if (radio) radio.checked = true;
+  if (typeof cfg.logo_enviado === "string" && cfg.logo_enviado) {
+    logoEnviado = { nome: cfg.logo_nome || "arquivo", dados: cfg.logo_enviado };
+    mostrarNomeDoLogo();
+  }
+}
+
+/* ------------------------------------------------- configuração em arquivo */
+
+/* O localStorage é conveniência no mesmo navegador; o arquivo é o caminho
+ * durável. Ele sobrevive a limpeza de navegador, troca de máquina e reimagem
+ * do laboratório pela TI da escola, guarda o logo — que não cabe na cota do
+ * localStorage — e ainda pode ser mandado por e-mail para um colega. */
+function configuracaoParaArquivo() {
+  return {
+    version: VERSAO_CONFIGURACAO,
+    ...lerFormulario(),
+    logo_nome: logoEnviado.nome,
+  };
+}
+
+function exportarConfiguracao() {
+  const texto = JSON.stringify(configuracaoParaArquivo(), null, 2);
+  const blob = new Blob([texto], { type: "application/json" });
+  baixarBlob(blob, NOME_ARQUIVO_CONFIG);
+}
+
+function lerComoTexto(arquivo) {
+  return new Promise((resolve, rejeitar) => {
+    const leitor = new FileReader();
+    leitor.onload = () => resolve(leitor.result);
+    leitor.onerror = () => rejeitar(new Error("Não foi possível ler o arquivo."));
+    leitor.readAsText(arquivo);
+  });
+}
+
+/* As mesmas regras de `_validar_logo` em models.py, aqui aplicadas ao data URI
+ * que veio dentro do arquivo — não há um File para medir como no envio. */
+function problemaNoLogoSalvo(dados) {
+  const separador = dados.indexOf(",");
+  const cabecalho = separador < 0 ? "" : dados.slice(0, separador);
+  const base64 = separador < 0 ? "" : dados.slice(separador + 1);
+  if (!cabecalho.startsWith("data:")) {
+    return "O logo do arquivo não está num formato reconhecido.";
+  }
+  const formato = cabecalho.slice("data:".length).split(";")[0];
+  if (!FORMATOS_LOGO.includes(formato)) {
+    return `O logo precisa ser PNG ou JPEG (recebido: ${formato || "desconhecido"}).`;
+  }
+  // base64 gasta 4 caracteres a cada 3 bytes; o '=' final é enchimento.
+  const bytes = Math.floor((base64.length * 3) / 4) - (base64.split("=").length - 1);
+  if (bytes > MAX_LOGO_BYTES) {
+    const megabytes = (bytes / (1024 * 1024)).toFixed(1);
+    return `O logo tem ${megabytes} MB e o limite é ${MAX_LOGO_BYTES / (1024 * 1024)} MB.`;
+  }
+  return null;
+}
+
+/* Diz o que impede o arquivo de ser aplicado, ou null se ele serve. */
+function problemaNoArquivo(cfg) {
+  if (cfg === null || typeof cfg !== "object" || Array.isArray(cfg)) {
+    return "O arquivo não parece uma configuração do gerador de bingo.";
+  }
+  // Sem `version` é arquivo de antes do campo existir: vale como versão 1.
+  const versao = cfg.version ?? VERSAO_CONFIGURACAO;
+  if (!Number.isInteger(versao) || versao > VERSAO_CONFIGURACAO) {
+    return `Este arquivo é da versão ${cfg.version} e esta página lê até a versão ${VERSAO_CONFIGURACAO}.`;
+  }
+  if (typeof cfg.logo_enviado === "string" && cfg.logo_enviado) {
+    return problemaNoLogoSalvo(cfg.logo_enviado);
+  }
+  return null;
+}
+
+/* Pela mesma razão de `restaurar()`, importar não pode lançar: arquivo de outra
+ * versão, corrompido ou que nem é JSON vira mensagem na interface. */
+async function aoEscolherConfiguracao(evento) {
+  // O change do input também borbulha até o form; tratar aqui é suficiente.
+  evento.stopPropagation();
+  const arquivo = el.arquivoConfig.files[0];
+  if (!arquivo) return;
+
+  try {
+    const cfg = JSON.parse(await lerComoTexto(arquivo));
+    const problema = problemaNoArquivo(cfg);
+    if (problema) {
+      mostrarErro(problema);
+      return;
+    }
+    aplicarConfiguracao(cfg);
+    atualizarPreview();
+  } catch (erro) {
+    mostrarErro("Não foi possível ler este arquivo de configuração.");
+  } finally {
+    // Sem isto, escolher o mesmo arquivo de novo não dispara `change` e a
+    // interface parece não reagir.
+    el.arquivoConfig.value = "";
   }
 }
 
@@ -515,6 +633,9 @@ el.btnSortear.addEventListener("click", sortearNovamente);
 el.btnTema.addEventListener("click", alternarTema);
 el.btnLogo.addEventListener("click", () => el.arquivoLogo.click());
 el.arquivoLogo.addEventListener("change", aoEscolherLogo);
+el.btnSalvarConfig.addEventListener("click", exportarConfiguracao);
+el.btnAbrirConfig.addEventListener("click", () => el.arquivoConfig.click());
+el.arquivoConfig.addEventListener("change", aoEscolherConfiguracao);
 
 aplicarTema(temaInicial());
 mostrarNomeDoLogo();

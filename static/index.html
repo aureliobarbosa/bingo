@@ -181,6 +181,32 @@ BTS</textarea>
               Sortear novamente
             </button>
           </div>
+
+          <div class="border-top mt-4 pt-3">
+            <label class="form-label small fw-semibold">Configuração</label>
+            <!-- O input fica fora do <label> de propósito: aninhado, o clique
+                 borbulha de volta ao label, que o reencaminha, e o comportamento
+                 varia entre navegadores. -->
+            <input type="file" id="arquivo_config" accept="application/json,.json"
+                   class="d-none">
+            <div class="row g-2">
+              <div class="col-6">
+                <button type="button" class="btn btn-outline-secondary btn-sm w-100"
+                        id="btn-salvar-config">
+                  Salvar em arquivo
+                </button>
+              </div>
+              <div class="col-6">
+                <button type="button" class="btn btn-outline-secondary btn-sm w-100"
+                        id="btn-abrir-config">
+                  Abrir arquivo
+                </button>
+              </div>
+            </div>
+            <div class="form-text">
+              O arquivo guarda tudo, inclusive o logo e o sorteio desta cartela.
+            </div>
+          </div>
         </form>
       </div>
     </aside>
