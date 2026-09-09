@@ -82,12 +82,27 @@ const MAX_CELULAS = 100; // precisa acompanhar MAX_CELULAS em src/bingo/models.p
 const MAX_ELEMENTOS = 100; // idem, MAX_ELEMENTOS em models.py
 const MAX_FOLHAS = 100; // idem, MAX_FOLHAS em models.py
 const MAX_PALAVRA_CARACTERES = 50; // idem, MAX_PALAVRA_CARACTERES em models.py
+const MAX_SEMENTE = 2 ** 32 - 1; // idem, MAX_SEMENTE em models.py
 const ESPERA_LIBERAR_BLOB_MS = 60_000;
 
 /* Imagem enviada pelo usuário. Fica só em memória: um data URI de alguns MB
  * estouraria a cota do localStorage e derrubaria o resto da configuração. */
 let logoEnviado = { nome: LOGO_PADRAO, dados: "" };
 let urlAtual = null;
+
+/* Semente do sorteio. Enquanto ela não muda, mexer nos outros campos redesenha
+ * a MESMA cartela — e o preview passa a ser literalmente a primeira página do
+ * PDF que o botão de baixar entrega. Quem quer outras cartelas pede por
+ * "Sortear novamente", que troca a semente. */
+let semente = novaSemente();
+
+function novaSemente() {
+  return Math.floor(Math.random() * (MAX_SEMENTE + 1));
+}
+
+function sementeValida(valor) {
+  return Number.isInteger(valor) && valor >= 0 && valor <= MAX_SEMENTE;
+}
 
 /* ------------------------------------------------------------ configuração */
 
@@ -115,6 +130,7 @@ function lerFormulario() {
     linhas: inteiro(el.linhas),
     colunas: inteiro(el.colunas),
     numero_folhas: inteiro(el.numeroFolhas),
+    semente,
     centro_livre: el.centroLivre.checked && !el.centroLivre.disabled,
     logo_enviado: logoEnviado.dados,
     titulo: el.titulo.value,
@@ -299,6 +315,13 @@ async function atualizarPreview() {
   }
 }
 
+/* Sem trocar a semente este botão redesenharia a mesma cartela, e pareceria
+ * quebrado. */
+function sortearNovamente() {
+  semente = novaSemente();
+  atualizarPreview();
+}
+
 async function baixar() {
   const cfg = lerFormulario();
   const problema = validar(cfg);
@@ -361,6 +384,9 @@ function restaurar() {
     el.numeroFolhas.value = cfg.numero_folhas ?? el.numeroFolhas.value;
     // `??` e não `Boolean()`: ausente significa manter o padrão, não desmarcar.
     el.centroLivre.checked = cfg.centro_livre ?? el.centroLivre.checked;
+    // Semente salva devolve as mesmas cartelas da sessão anterior; ausente ou
+    // estragada, vale a que foi sorteada na carga.
+    if (sementeValida(cfg.semente)) semente = cfg.semente;
     const radio = document.getElementById(`tipo-${cfg.tipo}`);
     if (radio) radio.checked = true;
   } catch (erro) {
@@ -485,7 +511,7 @@ function aoMudar() {
 el.form.addEventListener("input", aoMudar);
 el.form.addEventListener("change", aoMudar);
 el.btnBaixar.addEventListener("click", baixar);
-el.btnSortear.addEventListener("click", atualizarPreview);
+el.btnSortear.addEventListener("click", sortearNovamente);
 el.btnTema.addEventListener("click", alternarTema);
 el.btnLogo.addEventListener("click", () => el.arquivoLogo.click());
 el.arquivoLogo.addEventListener("change", aoEscolherLogo);

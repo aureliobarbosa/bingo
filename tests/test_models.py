@@ -2,7 +2,7 @@
 
 import pytest
 
-from bingo.models import MAX_ELEMENTOS, MAX_FOLHAS, ConfiguracaoJogo
+from bingo.models import MAX_ELEMENTOS, MAX_FOLHAS, MAX_SEMENTE, ConfiguracaoJogo
 
 PALAVRAS = tuple(f"palavra{i}" for i in range(20))
 
@@ -184,3 +184,16 @@ def test_universo_acima_do_teto_e_rejeitado_nos_dois_tipos():
             linhas=3,
             colunas=3,
         )
+
+
+def test_semente_e_opcional_e_aceita_a_faixa_inteira():
+    assert ConfiguracaoJogo().semente is None
+    assert ConfiguracaoJogo(semente=0).semente == 0
+    assert ConfiguracaoJogo(semente=MAX_SEMENTE).semente == MAX_SEMENTE
+
+
+def test_semente_fora_da_faixa():
+    with pytest.raises(ValueError, match="A semente deve estar"):
+        ConfiguracaoJogo(semente=-1)
+    with pytest.raises(ValueError, match="A semente deve estar"):
+        ConfiguracaoJogo(semente=MAX_SEMENTE + 1)

@@ -87,3 +87,41 @@ def test_jogo_grande_continua_sem_repetir():
     folhas = gerar_jogo(cfg)
     identidades = {frozenset(c for c in folha if c is not None) for folha in folhas}
     assert len(identidades) == 30
+
+
+def test_a_mesma_semente_reproduz_o_jogo_inteiro():
+    """É isto que faz a configuração salva em arquivo valer: regerar dá as
+    mesmas cartelas já impressas."""
+    cfg = ConfiguracaoJogo(numero_folhas=5, semente=12345)
+    assert gerar_jogo(cfg) == gerar_jogo(cfg)
+
+
+def test_sementes_diferentes_dao_jogos_diferentes():
+    primeiro = gerar_jogo(ConfiguracaoJogo(numero_folhas=5, semente=1))
+    segundo = gerar_jogo(ConfiguracaoJogo(numero_folhas=5, semente=2))
+    assert primeiro != segundo
+
+
+def test_sem_semente_cada_jogo_e_novo():
+    cfg = ConfiguracaoJogo(numero_folhas=5)
+    assert gerar_jogo(cfg) != gerar_jogo(cfg)
+
+
+def test_a_folha_do_preview_e_a_primeira_folha_do_jogo():
+    """`gerar_jogo` sorteia a primeira folha antes de qualquer descarte por
+    repetição, então o preview mostra a cartela que vai sair impressa."""
+    cfg = ConfiguracaoJogo(numero_folhas=10, semente=777)
+    assert gerar_folha(cfg) == gerar_jogo(cfg)[0]
+
+
+def test_a_semente_vale_tambem_para_palavras():
+    cfg = ConfiguracaoJogo(
+        tipo="palavras",
+        palavras=PALAVRAS,
+        linhas=3,
+        colunas=3,
+        centro_livre=True,
+        numero_folhas=4,
+        semente=99,
+    )
+    assert gerar_jogo(cfg) == gerar_jogo(cfg)

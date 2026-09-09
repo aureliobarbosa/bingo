@@ -20,6 +20,7 @@ from bingo.models import (
     MAX_FOLHAS,
     MAX_LOGO_BYTES,
     MAX_PALAVRA_CARACTERES,
+    MAX_SEMENTE,
     ConfiguracaoJogo,
     TipoBingo,
 )
@@ -100,6 +101,7 @@ class ConfiguracaoIn(BaseModel):
     linhas: int = Field(default=5, ge=1, le=20)
     colunas: int = Field(default=5, ge=1, le=20)
     numero_folhas: int = Field(default=10, ge=1, le=MAX_FOLHAS)
+    semente: int | None = Field(default=None, ge=0, le=MAX_SEMENTE)
     centro_livre: bool = True
     logo_enviado: str = Field(default="", max_length=MAX_LOGO_CARACTERES)
     titulo: str = Field(default="BINGO", max_length=80)
@@ -114,6 +116,7 @@ class ConfiguracaoIn(BaseModel):
             linhas=self.linhas,
             colunas=self.colunas,
             numero_folhas=self.numero_folhas,
+            semente=self.semente,
             centro_livre=self.centro_livre,
             logo_enviado=self.logo_enviado,
             titulo=self.titulo.strip(),

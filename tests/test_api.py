@@ -8,7 +8,7 @@ from pypdf import PdfReader
 
 from bingo import api
 from bingo.api import MAX_CORPO_BYTES, MAX_LOGO_CARACTERES, app
-from bingo.models import MAX_ELEMENTOS, MAX_PALAVRA_CARACTERES
+from bingo.models import MAX_ELEMENTOS, MAX_PALAVRA_CARACTERES, MAX_SEMENTE
 
 client = TestClient(app)
 
@@ -38,6 +38,10 @@ CONFIG = {
 
 def _paginas(conteudo: bytes) -> int:
     return len(PdfReader(io.BytesIO(conteudo)).pages)
+
+
+def _texto(conteudo: bytes, pagina: int = 0) -> str:
+    return PdfReader(io.BytesIO(conteudo)).pages[pagina].extract_text()
 
 
 def test_preview_devolve_pdf_de_uma_folha():
@@ -301,3 +305,27 @@ def test_as_respostas_de_recusa_tambem_levam_os_cabecalhos(monkeypatch):
     r = client.post("/api/preview", json=CONFIG)
     assert r.status_code == 429
     assert r.headers["x-content-type-options"] == "nosniff"
+
+
+def test_com_semente_o_preview_mostra_a_primeira_pagina_do_pdf():
+    """A promessa da tela: o que está no preview é o que sai impresso."""
+    config = CONFIG | {"semente": 4242}
+    preview = client.post("/api/preview", json=config)
+    jogo = client.post("/api/jogo", json=config)
+    assert preview.status_code == 200
+    assert jogo.status_code == 200
+    assert _texto(preview.content) == _texto(jogo.content)
+
+
+def test_a_mesma_semente_devolve_o_mesmo_jogo_em_requisicoes_diferentes():
+    config = CONFIG | {"semente": 4242}
+    primeiro = client.post("/api/jogo", json=config)
+    segundo = client.post("/api/jogo", json=config)
+    assert [_texto(primeiro.content, i) for i in range(CONFIG["numero_folhas"])] == [
+        _texto(segundo.content, i) for i in range(CONFIG["numero_folhas"])
+    ]
+
+
+def test_semente_fora_da_faixa_e_rejeitada_pelo_schema():
+    r = client.post("/api/preview", json=CONFIG | {"semente": MAX_SEMENTE + 1})
+    assert r.status_code == 422

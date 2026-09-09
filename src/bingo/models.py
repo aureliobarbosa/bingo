@@ -21,6 +21,12 @@ MAX_LOGO_BYTES = 2 * 1024 * 1024  # 2 MB: o data URI trafega a cada preview
 # inteira encolhe por causa de um texto só.
 MAX_PALAVRA_CARACTERES = 50
 
+# Faixa da semente do sorteio. 32 bits dão 4 bilhões de jogos distintos, o que
+# basta de sobra, e cabem inteiros num `Number` do JavaScript — que perde
+# precisão acima de 2**53 e devolveria ao servidor uma semente diferente da que
+# gerou o arquivo salvo.
+MAX_SEMENTE = 2**32 - 1
+
 
 @dataclass(frozen=True)
 class ConfiguracaoJogo:
@@ -36,6 +42,11 @@ class ConfiguracaoJogo:
     linhas: int = 5
     colunas: int = 5
     numero_folhas: int = 10
+    # Semente do sorteio. None sorteia da entropia do sistema; um inteiro
+    # reproduz exatamente as mesmas folhas, que é o que faz a configuração
+    # salva em arquivo valer — e o que faz o preview mostrar a folha que sairá
+    # impressa.
+    semente: int | None = None
     centro_livre: bool = True
     # Imagem enviada pelo usuário, como data URI. Vazio: usa o logo padrão.
     logo_enviado: str = ""
@@ -115,6 +126,9 @@ class ConfiguracaoJogo:
 
         if not 1 <= self.numero_folhas <= MAX_FOLHAS:
             raise ValueError(f"O número de folhas deve estar entre 1 e {MAX_FOLHAS}.")
+
+        if self.semente is not None and not 0 <= self.semente <= MAX_SEMENTE:
+            raise ValueError(f"A semente deve estar entre 0 e {MAX_SEMENTE}.")
 
         if self.tipo == "numeros":
             if not 1 <= self.numero_elementos <= MAX_ELEMENTOS:

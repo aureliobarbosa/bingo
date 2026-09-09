@@ -7,10 +7,19 @@ from bingo.models import ConfiguracaoJogo
 Folha = tuple[str | None, ...]
 
 
-def gerar_folha(cfg: ConfiguracaoJogo) -> Folha:
+def gerar_folha(cfg: ConfiguracaoJogo, sorteador: random.Random | None = None) -> Folha:
     """Sorteia uma folha: as células em ordem de leitura (esquerda→direita,
-    cima→baixo). None marca a célula central livre, quando houver."""
-    celulas: list[str | None] = random.sample(cfg.universo, cfg.elementos_por_folha)
+    cima→baixo). None marca a célula central livre, quando houver.
+
+    Sem `sorteador`, abre um `random.Random(cfg.semente)` novo — e é isso que
+    faz o preview valer: `gerar_jogo` sorteia a primeira folha antes de
+    qualquer descarte por repetição, então este caminho devolve exatamente a
+    primeira folha do jogo. Com `cfg.semente` em None o `Random` sorteia da
+    entropia do sistema, sem ramo condicional nenhum.
+    """
+    if sorteador is None:
+        sorteador = random.Random(cfg.semente)
+    celulas: list[str | None] = sorteador.sample(cfg.universo, cfg.elementos_por_folha)
     if cfg.indice_centro is not None:
         celulas.insert(cfg.indice_centro, None)
     return tuple(celulas)
@@ -32,7 +41,11 @@ def gerar_jogo(cfg: ConfiguracaoJogo) -> tuple[Folha, ...]:
     de cada elemento na grade; o conjunto entra apenas como chave de comparação.
     `ConfiguracaoJogo` já garante que existem combinações suficientes, e o teto
     de tentativas é só uma trava contra laço infinito.
+
+    O sorteador é um só para o jogo inteiro: com semente, o jogo é reproduzível
+    de ponta a ponta; sem ela, cada chamada dá um jogo novo.
     """
+    sorteador = random.Random(cfg.semente)
     limite_tentativas = max(1000, cfg.numero_folhas * 50)
     vistas: set[frozenset[str]] = set()
     folhas: list[Folha] = []
@@ -40,7 +53,7 @@ def gerar_jogo(cfg: ConfiguracaoJogo) -> tuple[Folha, ...]:
     for _ in range(limite_tentativas):
         if len(folhas) == cfg.numero_folhas:
             return tuple(folhas)
-        folha = gerar_folha(cfg)
+        folha = gerar_folha(cfg, sorteador)
         identidade = _identidade(folha)
         if identidade not in vistas:
             vistas.add(identidade)
