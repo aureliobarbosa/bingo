@@ -1,0 +1,37 @@
+# Vigilância de dependências.
+#
+# Este arquivo cuida das *version updates*: a checagem periódica que abre PR
+# quando sai versão nova. As *security updates* — a PR que corrige uma CVE assim
+# que o alerta chega — não moram aqui: são um botão em Settings → Advanced
+# Security, junto com o Dependency graph e os Dependabot alerts. Os dois
+# mecanismos convivem; o de segurança ignora o `schedule` abaixo e vem na hora.
+#
+# Nada aqui mescla nem publica nada. As PRs esperam por uma pessoa, e como o
+# deploy.yml dispara em push para main, é o merge manual que leva a dependência
+# nova a produção.
+version: 2
+
+updates:
+  # `uv`, e não `pip`: é o único ecossistema que entende o uv.lock. O `pip`
+  # mexeria só no pyproject.toml e deixaria o lock para trás — que é exatamente
+  # o que o `uv lock --check` do ci.yml reprova, então toda PR do robô nasceria
+  # vermelha.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    # Casa com as mensagens do projeto: `chore(deps): ...`. O corpo que o
+    # Dependabot escreve é em inglês e não há como traduzi-lo.
+    commit-message:
+      prefix: "chore"
+
+  # Cobre .github/workflows/ inteiro — ci.yml e deploy.yml — a partir da raiz.
+  # Vale para as versões das *actions*; o `version:` que o setup-uv recebe é o
+  # env.UV_VERSION do ci.yml, que segue sendo trocado à mão junto com o ARG
+  # UV_VERSION do Dockerfile.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "chore"
