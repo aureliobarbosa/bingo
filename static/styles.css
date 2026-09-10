@@ -34,3 +34,17 @@ legend.form-label {
   font-size: 0.875rem;
   margin-bottom: 0.5rem;
 }
+
+/* Sombreamento leve ao passar o mouse, igual em todos os botões do painel.
+   A cor sai de `--bs-emphasis-color-rgb`, que o Bootstrap inverte junto com o
+   tema: sombra escura no claro e brilho claro no escuro. Uma sombra preta fixa
+   simplesmente sumiria no modo noturno. */
+aside.painel .btn:hover {
+  box-shadow: 0 0.125rem 0.375rem rgba(var(--bs-emphasis-color-rgb), 0.25);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  aside.painel .btn {
+    transition: box-shadow 0.15s ease-in-out;
+  }
+}
