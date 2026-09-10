@@ -1,6 +1,6 @@
 [project]
 name = "bingo"
-version = "0.1.0"
+version = "0.9"
 description = "Gerador web de cartelas de bingo para impressão"
 readme = "README.md"
 requires-python = ">=3.14"

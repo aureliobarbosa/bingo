@@ -1,14 +1,16 @@
 """Testes das rotas HTTP."""
 
 import io
+import tomllib
 
 import pytest
 from fastapi.testclient import TestClient
 from pypdf import PdfReader
 
 from bingo import api
-from bingo.api import MAX_CORPO_BYTES, MAX_LOGO_CARACTERES, app
+from bingo.api import MAX_CORPO_BYTES, MAX_LOGO_CARACTERES, STATIC, app
 from bingo.models import MAX_ELEMENTOS, MAX_PALAVRA_CARACTERES, MAX_SEMENTE
+from bingo.pdf import RAIZ_PROJETO
 
 client = TestClient(app)
 
@@ -339,3 +341,13 @@ def test_o_arquivo_de_configuracao_e_aceito_como_esta_pelas_rotas():
     r = client.post("/api/preview", json=arquivo)
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
+
+
+def test_a_versao_da_tela_acompanha_a_do_pyproject():
+    """A versão vive em dois lugares — o `pyproject.toml` e o rodapé do painel —
+    até existir o controle automatizado. Este teste é o que impede que se
+    separem: quem subir uma e esquecer a outra descobre aqui, não no ar."""
+    pyproject = tomllib.loads((RAIZ_PROJETO / "pyproject.toml").read_text())
+    versao = pyproject["project"]["version"]
+    pagina = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert f"Bingo410 {versao}" in pagina
