@@ -218,8 +218,8 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
 - **Mexeu em dependência, rode `uv lock`.** O `pyproject.toml` sozinho deixa o
   `uv.lock` para trás e o `uv lock --check` reprova no primeiro passo do job
   `Testes` — e o `deploy.yml`, que dispara no mesmo push sem depender do
-  `ci.yml`, **publica assim mesmo**. Já aconteceu na subida do pillow para
-  `>=12.3`.
+  `ci.yml`, **publicaria assim mesmo**. Quase aconteceu na subida do pillow para
+  `>=12.3`, pega antes do push.
 - **A versão do uv vive em dois lugares**: o `ARG UV_VERSION` do `Dockerfile` e
   o `env.UV_VERSION` de `.github/workflows/ci.yml`. Elas devem andar juntas,
   senão o CI resolve dependências com uma ferramenta diferente da que constrói

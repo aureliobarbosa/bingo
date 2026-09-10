@@ -143,7 +143,8 @@ em [DECISOES.md](DECISOES.md); em uma linha cada:
 - **Sem agrupamento e sem auto-merge** — num repositório que publica em push
   para `main`, auto-merge é publicação automática.
 - **O lock esquecido virou armadilha registrada** — subir dependência sem
-  `uv lock` deixa o `main` vermelho, e o `deploy.yml` publica assim mesmo.
+  `uv lock` reprova no `uv lock --check`, e o `deploy.yml` publicaria assim
+  mesmo, por não depender do `ci.yml`.
 
 ---
 

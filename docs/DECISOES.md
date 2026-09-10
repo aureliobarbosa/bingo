@@ -1488,9 +1488,11 @@ com o `pyproject.toml` novo e o lock velho, e o `uv lock --check` que abre o job
 `Testes` reprovaria **toda** PR do robô. Não é preferência de ferramenta: é o
 que faz a configuração funcionar.
 
-A prova disso aconteceu no commit anterior a esta etapa, à mão: subir
-`pillow>=11` para `>=12.3` sem rodar `uv lock` deixou o `main` vermelho no
-primeiro passo do CI. O `deploy.yml` publicou assim mesmo — ele dispara pelo
+O ensaio disso veio do commit anterior a esta etapa, à mão: subir `pillow>=11`
+para `>=12.3` sem rodar `uv lock` deixou o lock declarando `>=11`, e o
+`uv lock --check` reprovou localmente. O commit foi corrigido antes de ir para
+o origin, então o CI nunca chegou a ver essa versão — mas se tivesse ido, o job
+`Testes` teria falhado **sem segurar a publicação**: o `deploy.yml` dispara pelo
 mesmo push, em paralelo, e não depende do `ci.yml`.
 
 ### O que fica de fora: as imagens do `Dockerfile`
