@@ -176,6 +176,12 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   Números/Palavras fica em contorno: ali o preenchimento é o que marca a
   escolha. O rodapé leva versão, autoria, o ícone do GitHub em SVG embutido
   (a CSP barraria `<img>` de outro domínio) e o link do Lattes.
+- **Dependabot diário** (`.github/dependabot.yml`) para `uv` e
+  `github-actions`, sem agrupamento e sem auto-merge — num repositório que
+  publica em push para `main`, auto-merge seria publicação automática. O
+  ecossistema é `uv` e não `pip`: só ele mexe no `uv.lock`. As imagens do
+  `Dockerfile` ficaram de fora, e as PRs de *segurança* não saem do arquivo —
+  são três chaves em *Settings → Advanced Security*.
 - **O repositório é peça de portfólio, sob licença MIT, e não recebe PR da
   comunidade** — o ajuste é do GitHub, em *Settings → General → Features*, e
   não trava clone nem fork. O `README.md` fala com dois leitores, o professor
@@ -209,6 +215,11 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   com *"glob `LICENSE` did not match any files"*: o `Dockerfile` copiava
   `pyproject.toml`, `uv.lock` e `README.md`, e não o `LICENSE`. Passa nos testes
   e na estática, e quebra só no job `imagem` — que foi o que pegou.
+- **Mexeu em dependência, rode `uv lock`.** O `pyproject.toml` sozinho deixa o
+  `uv.lock` para trás e o `uv lock --check` reprova no primeiro passo do job
+  `Testes` — e o `deploy.yml`, que dispara no mesmo push sem depender do
+  `ci.yml`, **publica assim mesmo**. Já aconteceu na subida do pillow para
+  `>=12.3`.
 - **A versão do uv vive em dois lugares**: o `ARG UV_VERSION` do `Dockerfile` e
   o `env.UV_VERSION` de `.github/workflows/ci.yml`. Elas devem andar juntas,
   senão o CI resolve dependências com uma ferramenta diferente da que constrói

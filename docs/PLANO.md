@@ -3,7 +3,8 @@
 > **Andamento** — **o plano acabou.** As dez etapas estão concluídas e o
 > projeto está na **1.0**, publicado em **https://bingo410.web.app** (Firebase
 > Hosting à frente do Cloud Run), com cada push em `main` implantando sozinho.
-> O que resta é o que só o navegador de uma pessoa responde, listado em
+> Depois delas veio a Etapa 11, de vigilância de dependências, também
+> concluída. O que resta está em
 > [Conferências pendentes](#conferências-pendentes).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
@@ -127,9 +128,29 @@ arquivo em `docs/imagens/tela.png`.
 
 ---
 
+## Etapa 11 — Vigilância de dependências — **concluída**
+
+Fora do plano original: veio de uma conferência de segurança do usuário, que
+apontou as correções recentes do pillow. Feita em dois commits. O porquê está
+em [DECISOES.md](DECISOES.md); em uma linha cada:
+
+- **Dependabot diário** em `.github/dependabot.yml`, para `uv` e
+  `github-actions` — as imagens do `Dockerfile` ficaram de fora.
+- **`uv`, e não `pip`** — só ele entende o `uv.lock`; com `pip` toda PR do robô
+  reprovaria no `uv lock --check` do CI.
+- **PRs de segurança não saem do arquivo** — são três chaves em *Settings →
+  Advanced Security*, ligadas pelo usuário.
+- **Sem agrupamento e sem auto-merge** — num repositório que publica em push
+  para `main`, auto-merge é publicação automática.
+- **O lock esquecido virou armadilha registrada** — subir dependência sem
+  `uv lock` deixa o `main` vermelho, e o `deploy.yml` publica assim mesmo.
+
+---
+
 ## Conferências pendentes
 
-Nenhuma é de código: são as que só o navegador de uma pessoa responde.
+Nenhuma é de código: duas só o navegador de uma pessoa responde, e a
+terceira só o GitHub responde.
 
 1. **A CSP no Firefox pelo endereço novo** (Etapa 8.4). Os cabeçalhos
    atravessam a CDN inteiros e a fumaça passa, mas quem obedece à CSP é o
@@ -138,6 +159,11 @@ Nenhuma é de código: são as que só o navegador de uma pessoa responde.
    visualizador interno que escapa dela.
 2. **A Etapa 9 no navegador** — salvar e abrir o arquivo de configuração, com o
    logo e a semente voltando inteiros.
+3. **A primeira PR do Dependabot** (Etapa 11). Em *Insights → Dependency graph
+   → Dependabot*, os dois ecossistemas devem aparecer com data de checagem — é
+   o único lugar que valida o `dependabot.yml`, e um erro ali não reprova o CI.
+   Na PR em si, conferir que o `ci.yml` passa: o token somente-leitura do
+   Dependabot pode barrar a gravação do cache no job `imagem`.
 
 ---
 

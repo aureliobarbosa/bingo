@@ -1460,6 +1460,101 @@ inexistente renderiza ícone quebrado justamente na página do projeto.
 
 ---
 
+## Etapa 11 — Vigilância de dependências — **concluída**
+
+> Fora do plano original: nasceu de uma conferência de segurança do usuário
+> numa sessão paralela, que apontou as correções recentes do pillow.
+
+### O arquivo e o botão são coisas diferentes
+
+O `.github/dependabot.yml` configura **version updates**: a checagem periódica
+que abre PR quando sai versão nova, aqui diária. As **security updates** — a PR
+que corrige uma CVE assim que o alerta chega — não saem de arquivo nenhum: são
+três chaves em *Settings → Advanced Security*, ligadas pelo usuário: o
+*Dependency graph* (que lê o `uv.lock`), os *Dependabot alerts* e as
+*Dependabot security updates*.
+
+A distinção importa porque as instruções que originaram a etapa pediam "enable
+automatic security-update PRs" junto de "daily checks", como se as duas coisas
+saíssem do mesmo lugar. Só a segunda sai. E as duas são úteis por motivos
+diferentes: o alerta age sobre CVE publicada, e a checagem diária age sobre a
+versão que ninguém conferiu — foi assim que o pillow envelheceu até a
+conferência manual.
+
+### `uv`, e não `pip`
+
+O ecossistema `pip` lê o `pyproject.toml` e ignora o `uv.lock`. A PR chegaria
+com o `pyproject.toml` novo e o lock velho, e o `uv lock --check` que abre o job
+`Testes` reprovaria **toda** PR do robô. Não é preferência de ferramenta: é o
+que faz a configuração funcionar.
+
+A prova disso aconteceu no commit anterior a esta etapa, à mão: subir
+`pillow>=11` para `>=12.3` sem rodar `uv lock` deixou o `main` vermelho no
+primeiro passo do CI. O `deploy.yml` publicou assim mesmo — ele dispara pelo
+mesmo push, em paralelo, e não depende do `ci.yml`.
+
+### O que fica de fora: as imagens do `Dockerfile`
+
+O ecossistema `docker` cobriria o `python:3.14-slim-bookworm`. Ficou de fora, e
+não por descuido: **a tag flutua**. A Docker Official Images reconstrói
+`3.14-slim-bookworm` a cada patch do Python 3.14.x e do Debian, e o
+`docker/build-push-action` roda em runner efêmero, sem imagem local — resolve a
+tag do zero toda vez. Então cada push em `main` já reconstrói sobre a base
+corrigida do dia. O que o Dependabot proporia não seria correção de CVE: seria
+`python:3.15` ou `-slim-trixie`, que é decisão de compatibilidade.
+
+O Python 3.14 recebe correções de segurança até ~outubro de 2030, então fechar
+a minor não abre buraco nenhum. **O relógio que corre é o do Debian**: o
+`bookworm` sai do suporte regular por volta de agosto de 2026 e passa ao LTS.
+O bump manual que aparece primeiro, portanto, é `bookworm` → `trixie` — e as
+três linhas `FROM` mudam juntas, porque o venv copiado de `construcao` para
+`producao` não é relocável entre instalações de Python diferentes.
+
+Pesou também um custo escondido: o `ARG UV_VERSION` do `Dockerfile` é metade de
+um par que o `env.UV_VERSION` do `ci.yml` precisa acompanhar. Uma PR automática
+mexeria num lado só, e o CI não reprova por essa divergência — ele apenas passa
+a resolver dependências com uma ferramenta diferente da que constrói a imagem.
+
+O buraco que sobra não é a tag: é o **intervalo entre reconstruções**. Não há
+`schedule:` em workflow nenhum, então a imagem que está servindo carrega o
+Debian do dia do último push. Nenhuma configuração do Dependabot resolveria
+isso — não há linha de arquivo para mudar. O que resolve é reimplantar de
+tempos em tempos, e o `deploy.yml` já aceita `workflow_dispatch` para isso.
+
+### Sem auto-merge, porque `main` publica sozinho
+
+Nenhum workflow novo e nenhuma permissão nova. Num repositório com
+`deploy.yml` disparando em push para `main`, auto-merge não significa "merge
+automático": significa **publicação automática** de código de terceiro sem
+ninguém ler o diff. As PRs esperam por uma pessoa.
+
+Pelo mesmo motivo o `ci.yml` não foi tocado. Ele já roda em `pull_request`, e as
+PRs do Dependabot nascem em ramo do próprio repositório — o ajuste de *Settings
+→ General → Features* que restringe PR a colaboradores não alcança o robô.
+
+### Uma PR por dependência
+
+Escolha do usuário, contra o agrupamento. Cada bump chega isolado, fácil de ler
+e de reverter; o preço é a fila, que a checagem diária alimenta. O
+`open-pull-requests-limit` fica no padrão (5) para as de versão; as de segurança
+têm fila própria, de até 10, e não disputam com essas.
+
+### Como foi verificado
+
+O `dependabot.yml` não tem validador local: o YAML foi conferido com
+`yaml.safe_load` (sintaxe e os dois ecossistemas), e quem valida o *conteúdo* —
+`package-ecosystem` desconhecido, campo fora de lugar — é o próprio GitHub, em
+*Insights → Dependency graph → Dependabot*, onde o erro aparece como aviso no
+arquivo e **não** reprova o CI. É lá também que se força uma checagem na hora,
+com *Check for updates*, sem esperar o ciclo diário.
+
+Fica de pé para a primeira PR do robô: PRs do Dependabot rodam com token
+somente-leitura, e o `cache-to: type=gha,mode=max` do job `imagem` pode falhar
+ao gravar o cache. Se for isso que reprovar — e só nesse caso —, o conserto é
+`ignore-error=true` no mesmo `cache-to`.
+
+---
+
 ## Avaliação de modelo e de contexto (pedido pelo usuário)
 
 > **Escrita no planejamento, revista em 2026-09-06.** As etapas 1–7 citadas
