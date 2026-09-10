@@ -198,6 +198,10 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   o `env.UV_VERSION` de `.github/workflows/ci.yml`. Elas devem andar juntas,
   senão o CI resolve dependências com uma ferramenta diferente da que constrói
   a imagem.
+- **A versão do projeto vive em dois lugares** até o controle automatizado
+  chegar: o `version` do `pyproject.toml` e o rodapé de `static/index.html`.
+  Elas mudam juntas, e `test_a_versao_da_tela_acompanha_a_do_pyproject` reprova
+  se não mudarem.
 - **`comando | head` sob `set -o pipefail` reprova ao acaso.** O `head` fecha o
   cano e quem escreve morre de EPIPE — mas só quando a saída não cabe no buffer
   de 64 KB do pipe. Foi assim que o `scripts/fumaca.sh` passou localmente e
