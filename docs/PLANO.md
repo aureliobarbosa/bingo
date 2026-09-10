@@ -160,11 +160,15 @@ terceira só o GitHub responde.
    visualizador interno que escapa dela.
 2. **A Etapa 9 no navegador** — salvar e abrir o arquivo de configuração, com o
    logo e a semente voltando inteiros.
-3. **A primeira PR do Dependabot** (Etapa 11). Em *Insights → Dependency graph
-   → Dependabot*, os dois ecossistemas devem aparecer com data de checagem — é
-   o único lugar que valida o `dependabot.yml`, e um erro ali não reprova o CI.
-   Na PR em si, conferir que o `ci.yml` passa: o token somente-leitura do
-   Dependabot pode barrar a gravação do cache no job `imagem`.
+3. **A primeira PR do Dependabot** (Etapa 11). A configuração já foi conferida:
+   em *Insights → Dependency graph → Dependabot* os quatro manifestos aparecem
+   lidos (`pyproject.toml`, `uv.lock`, `ci.yml`, `deploy.yml`). Falta o que só o
+   tempo responde — se a PR **nasce**, já que o repositório restringe a criação
+   de PR a colaboradores (o robô cria o ramo dentro do próprio repositório, e
+   não deveria ser alcançado pela restrição), e se o `ci.yml` **passa nela**: PR
+   do Dependabot roda com token somente-leitura, e o `cache-to: type=gha` do job
+   `imagem` pode falhar ao gravar o cache. Se for só isso que reprovar, o
+   conserto é `ignore-error=true` no mesmo `cache-to`.
 
 ---
 
