@@ -204,6 +204,11 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   `Cache-Control: no-cache` e o ETag fecha a revalidação em 304. A armadilha
   fica registrada porque a versão velha do `app.js` já levou a diagnósticos
   errados: se ela reaparecer, confira primeiro se o cabeçalho ainda está lá.
+- **Todo arquivo que o `pyproject.toml` referencia precisa entrar no contexto
+  do build.** O `license-files = ["LICENSE"]` fez o `uv sync` da imagem falhar
+  com *"glob `LICENSE` did not match any files"*: o `Dockerfile` copiava
+  `pyproject.toml`, `uv.lock` e `README.md`, e não o `LICENSE`. Passa nos testes
+  e na estática, e quebra só no job `imagem` — que foi o que pegou.
 - **A versão do uv vive em dois lugares**: o `ARG UV_VERSION` do `Dockerfile` e
   o `env.UV_VERSION` de `.github/workflows/ci.yml`. Elas devem andar juntas,
   senão o CI resolve dependências com uma ferramenta diferente da que constrói

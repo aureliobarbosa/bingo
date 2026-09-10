@@ -1430,6 +1430,20 @@ A menção a *Test Driven Development* saiu do texto do autor: os testes foram
 escritos junto de cada funcionalidade, no mesmo commit, e não antes dela. Num
 README de portfólio, quem conhece a sigla confere o histórico e vê a diferença.
 
+### A licença quebrou o build da imagem, e o CI pegou
+
+O `license-files = ["LICENSE"]` no `pyproject.toml` faz o backend de build
+exigir o arquivo no contexto. O `Dockerfile` copiava `pyproject.toml`, `uv.lock`
+e `README.md`, mas não o `LICENSE`, então o `uv sync` que instala o projeto
+recusou a metadata com *"glob `LICENSE` did not match any files"*.
+
+Os testes e a análise estática passaram: quem reprovou foi o job `imagem`, que
+constrói o estágio de produção. É a razão de ele existir — a mesma dos casos do
+`RAIZ_PROJETO` e do venv não-relocável, que também atravessam o teste e só
+aparecem na imagem. Sem docker no ambiente de desenvolvimento, o erro foi
+reproduzido copiando `pyproject.toml`, `uv.lock`, `README.md` e `src/` para um
+diretório temporário e rodando o mesmo `uv sync --frozen --no-dev`.
+
 ### O que ficou faltando
 
 A conferência no navegador é do usuário — não há Chrome nem Chromium neste

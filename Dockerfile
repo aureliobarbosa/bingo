@@ -46,7 +46,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock README.md LICENSE ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project
 
@@ -55,6 +55,10 @@ CMD ["uv", "run", "uvicorn", "bingo.api:app", \
      "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # --- construção ------------------------------------------------------------
+# O `LICENSE` é copiado junto do `pyproject.toml` porque o `license-files` de lá
+# aponta para ele: sem o arquivo no contexto, o backend de build recusa a
+# metadata e o `uv sync` que instala o projeto falha. Vale para todo arquivo que
+# o `pyproject.toml` referencie — o `README.md` está aqui pelo mesmo motivo.
 FROM python:3.14-slim-bookworm AS construcao
 COPY --from=uv /uv /uvx /bin/
 
@@ -62,7 +66,7 @@ ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
 WORKDIR /app
-COPY pyproject.toml uv.lock README.md ./
+COPY pyproject.toml uv.lock README.md LICENSE ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 
