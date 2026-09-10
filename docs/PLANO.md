@@ -1,11 +1,9 @@
 # Bingo — o que falta fazer
 
-> **Andamento** — Etapa 8 concluída: o serviço está publicado em
-> `https://bingo-286308093839.southamerica-east1.run.app`, cada push em `main`
-> implanta sozinho e as proteções que substituem a autenticação estão todas no
-> lugar. A Etapa 8.4 fechou o endereço público: o serviço atende em
-> **https://bingo410.web.app**, pelo Firebase Hosting. Restam a 9 (arquivo de
-> configuração) e a 10 (documentação).
+> **Andamento** — Etapas 8 e 9 concluídas. O serviço está publicado em
+> **https://bingo410.web.app** (Firebase Hosting à frente do Cloud Run), cada
+> push em `main` implanta sozinho, e a configuração agora tem semente e sai em
+> arquivo JSON. **Resta a 10 (documentação).**
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
 ao mexer numa área pronta; não é preciso lê-lo inteiro para começar uma etapa. O
@@ -15,7 +13,7 @@ resumo de uma linha por decisão está no [CLAUDE.md](../CLAUDE.md).
 
 Serviço *stateless* que gera cartelas de bingo em PDF para impressão: FastAPI e
 ReportLab Toolkit no backend, Bootstrap 5 com JavaScript sem build step no frontend. O devcontainer e a imagem de produção saem do mesmo `Dockerfile`, com base única
-nos três estágios. Os 58 testes passam e o serviço está publicado no Google Cloud Run.
+nos três estágios. Os 83 testes passam e o serviço está publicado no Google Cloud Run.
 
 **Origem das etapas 6.2 a 9:** um briefing produzido numa sessão paralela sobre
 hospedagem, servidor e armazenamento, conferido contra o código. Ele confirmou
@@ -75,50 +73,29 @@ CSP é o navegador e o erro é silencioso.
 
 ---
 
-## Etapa 9 — Configuração em arquivo JSON
+## Etapa 9 — Configuração em arquivo JSON — **concluída**
 
-Hoje a configuração fica no `localStorage`, que **não guarda o logo**: alguns MB
-estourariam a cota. Ao recarregar a página o logo volta a ser o padrão. Um
-arquivo exportável resolve isso e ainda sobrevive a limpeza de navegador, troca
-de máquina e atualização da imagem de laboratório pela TI da escola — e pode ser mandado por e-mail para um colega, o que vira compartilhamento sem custo de código.
+Feita nos dois commits previstos, com os testes junto (83 no total). O porquê de
+cada escolha está em [DECISOES.md](DECISOES.md); em uma linha cada:
 
-O `localStorage` **continua**, como conveniência no mesmo navegador; o arquivo é
-o caminho durável.
+- **Semente do sorteio** — `semente: int | None` em `ConfiguracaoJogo` e um
+  `random.Random(cfg.semente)` num caminho único, sem ramo condicional.
+- **O preview passa a valer** — `gerar_jogo` sorteia a primeira folha antes de
+  qualquer descarte, então ela é a folha do preview; medido idêntico byte a byte
+  no fluxo de desenho da página.
+- **A semente para em `2**32-1`** — acima de `2**53` o `Number` do JavaScript
+  perde precisão e devolveria ao servidor outra semente.
+- **"Sortear novamente" troca a semente** — sem isso ele redesenharia a mesma
+  cartela e pareceria quebrado.
+- **O arquivo é o objeto da API mais `version` e `logo_nome`** — campos extras
+  são ignorados pelo Pydantic; nada de novo no backend e nada de novo na CSP.
+- **Reuso, não redescoberta** — `baixarBlob` saiu de `baixar()`,
+  `aplicarConfiguracao` saiu de `restaurar()`, e importar não pode lançar.
 
-**Semente.** Campo `semente: int | None = None` em `ConfiguracaoJogo`;
-`gerador.py` passa a usar `random.Random(cfg.semente)` num caminho único — com
-`None` o `Random` sorteia da entropia do sistema, então não há ramo condicional.
-Sem semente gravada, regerar a partir de uma configuração salva produz cartelas
-diferentes das já impressas, e o arquivo salvo vale pela metade.
+Falta a conferência no navegador pelo usuário: o Node prova a lógica, não o
+layout, os eventos nem a CSP.
 
-A propriedade que faz o preview valer: `gerar_jogo` sorteia a primeira folha
-antes de qualquer descarte por repetição, então `gerar_folha` com um
-`Random(semente)` recém-criado devolve exatamente a primeira folha do jogo. O
-preview passa a mostrar a cartela que vai sair impressa.
-
-Ressalva a registrar junto do código: o Python não garante formalmente que
-`random.sample` produza a mesma sequência entre versões. O risco é baixo e o
-campo `version` do arquivo dá saída se um dia importar.
-
-**Arquivo.** A mesma forma do objeto que a API já aceita, mais `version: 1` e
-`semente`, com o logo como data URI. Exportar com `Blob` +
-`URL.createObjectURL` + `<a download>`; importar com `<input type="file">`.
-
-Duas armadilhas já registradas no `CLAUDE.md` valem aqui e devem ser reusadas,
-não redescobertas: **limpar o `value` do input depois de ler** e **não aninhar o
-`<input>` dentro do `<label>`** que serve de botão. E a importação **não pode
-lançar**, pela mesma razão que `restaurar()` não pode: arquivo de outra versão ou
-corrompido vira mensagem na interface, não inicialização morta.
-
-**Botão "Sortear novamente"** — ele **já existe** e funciona: é o `#btn-sortear`
-no fim do painel lateral, ligado a `atualizarPreview` em `static/app.js`. Hoje
-ele sorteia de novo por consequência, não por decisão: sem semente, cada
-requisição faz o servidor sortear outra vez. Com a semente, ele passa a **gerar
-uma semente nova** antes de atualizar o preview — senão o botão vira um botão
-que não faz nada, porque a mesma semente devolve a mesma cartela. Não há botão a
-criar; há um comportamento a acrescentar ao que existe.
-
-Commits: um para a semente com seus testes, outro para exportar/importar.
+---
 
 ## Etapa 10 — Documentação
 

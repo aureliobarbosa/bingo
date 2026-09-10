@@ -1208,6 +1208,132 @@ acima.
 
 ---
 
+## Etapa 9 — Configuração em arquivo JSON — **concluída**
+
+Duas coisas na mesma etapa, e a ordem importa: a semente veio primeiro porque
+sem ela o arquivo valeria pela metade — reabrir uma configuração salva daria
+cartelas diferentes das que já foram impressas e distribuídas.
+
+### A semente conserta uma promessa que a tela já fazia
+
+Sem semente, cada requisição sorteava de novo. O preview mostrava uma cartela e
+o PDF baixado trazia outra, embora a tela diga "primeira folha, como será
+impressa". Ninguém tinha reclamado porque, para escolher grade e fonte, uma
+cartela qualquer serve — mas a promessa estava quebrada desde a Etapa 6.
+
+`ConfiguracaoJogo` ganhou `semente: int | None = None` e `gerador.py` passou a
+sortear por um `random.Random(cfg.semente)`. **Não há ramo condicional sobre a
+semente**: `Random(None)` se alimenta da entropia do sistema, que é exatamente
+o comportamento antigo. O único `if` é o do parâmetro opcional `sorteador`, que
+existe para o jogo inteiro compartilhar um sorteador só.
+
+A propriedade que faz o preview valer: `gerar_jogo` sorteia a primeira folha
+**antes** de qualquer descarte por repetição, então `gerar_folha(cfg)` — que
+abre um `Random(cfg.semente)` recém-criado — devolve exatamente a primeira
+folha do jogo. Não é coincidência a preservar por acidente: há teste para ela
+em `tests/test_gerador.py`, e outro na API comparando o texto extraído das duas
+rotas.
+
+**Medido, e não só testado:** com a mesma semente, o desenho da página do
+`/api/preview` e o da primeira página do `/api/jogo` são **idênticos byte a
+byte** (`pypdf`, `page.get_contents().get_data()`). O `pdftoppm` que o
+`CLAUDE.md` sugere não existe neste ambiente; comparar o fluxo de conteúdo é
+mais estrito que comparar a imagem, e não depende de ferramenta externa.
+
+O PDF inteiro **não** é comparável byte a byte: o reportlab carimba data de
+criação e um ID de documento. Por isso os testes comparam texto de página ou
+fluxo de desenho, nunca o arquivo.
+
+### Por que a semente para em 2**32-1
+
+Não é limite do `random`, que aceita inteiro de qualquer tamanho. É o
+JavaScript: acima de `2**53` o `Number` perde precisão, e uma semente gravada
+no arquivo voltaria ao servidor com outro valor — o jogo "reproduzido" seria
+outro, silenciosamente. 32 bits dão 4 bilhões de jogos distintos, muito além do
+necessário, e cabem com folga na faixa segura.
+
+`MAX_SEMENTE` é a **quinta** constante da lista que vive em dois lugares
+(`models.py` e `static/app.js`); não vai ao `index.html` porque não há campo de
+semente na tela — ela é gerada, nunca digitada.
+
+### O botão "Sortear novamente" precisou da semente para continuar funcionando
+
+Ele já existia e sorteava de novo **por consequência**: sem semente, qualquer
+requisição dava um jogo novo. Com a semente fixa, ele passaria a redesenhar a
+mesma cartela e pareceria quebrado. Por isso `sortearNovamente()` troca a
+semente antes de atualizar o preview. É o único ponto da interface que gera
+semente nova depois da carga.
+
+### O arquivo é o objeto da API mais dois campos
+
+`{version: 1, ...configuração, logo_nome}`. Nada de formato próprio: o arquivo
+é literalmente o que a API já aceita, com o logo como data URI e a semente
+junto. Os dois campos a mais são ignorados pelo Pydantic, então ele pode ser
+reenviado inteiro sem podar nada — e há teste em `tests/test_api.py` que avisa
+se o schema um dia passar a proibir campos extras.
+
+`version` existe pela ressalva registrada no plano: **o Python não garante
+formalmente que `random.sample` produza a mesma sequência entre versões**. O
+risco é baixo (o algoritmo não muda desde sempre), mas se um dia mudar, é o
+`version` que dá saída — a página recusa o arquivo com mensagem em vez de
+entregar cartelas diferentes das impressas.
+
+Arquivo **sem** `version` é aceito como versão 1, e cada campo ausente mantém o
+que já estava na tela. Assim um arquivo mais velho aplica o que tem em vez de
+zerar o resto.
+
+### Nada de novo no backend, e nada de novo na CSP
+
+Exportar e importar são inteiramente do frontend: o servidor continua stateless
+e sem saber que arquivo existe. E a CSP não precisou de diretiva nova — o
+`<a download>` com `blob:` já era o caminho do botão de baixar PDF, e o
+`FileReader` lê do disco, sem passar pela rede. Foi conferido de propósito,
+porque o `CLAUDE.md` manda revisar a CSP a cada mexida no frontend e o erro
+dela é silencioso.
+
+### Reuso, para não redescobrir armadilha já paga
+
+Três coisas saíram de onde já existiam, em vez de nascer de novo:
+
+- `baixarBlob(blob, nome)` foi extraída de `baixar()` e serve ao PDF e ao
+  arquivo de configuração.
+- `aplicarConfiguracao(cfg)` foi extraída de `restaurar()` e serve aos dois
+  caminhos de volta: o localStorage (que não guarda o logo) e o arquivo (que
+  guarda).
+- O `<input type="file">` fica **fora** do `<label>` e tem o `value` limpo
+  depois de ler — as duas armadilhas do envio de logo, registradas no
+  `CLAUDE.md`, valem igual aqui.
+
+E importar **não pode lançar**, pela mesma razão que `restaurar()` não pode
+(item 6.1.4): arquivo de outra versão, corrompido ou que nem é JSON vira
+mensagem na interface, não inicialização morta.
+
+### Como foi verificado
+
+Sem navegador interativo, pela receita do `CLAUDE.md` — mas com Node, porque o
+Chrome não está instalado neste ambiente. `static/app.js` foi avaliado com
+`vm.runInContext` num contexto com `document`, `localStorage`, `Blob`,
+`FileReader` e `URL` mínimos, e então as funções foram chamadas direto:
+
+- a semente inicial é inteira e está na faixa; `sortearNovamente()` a troca; ela
+  chega ao `localStorage`;
+- semente salva volta na carga seguinte, e semente estragada (`"abc"`, `-5`,
+  `2**33`, `null`, `{}`) é descartada sem derrubar a inicialização;
+- o exportado leva `version`, semente, campos do jogo e nome do logo, e o
+  download sai com o nome e o tipo certos;
+- o importado chega aos campos, ao rótulo do logo e à semente, e o `value` do
+  input é limpo nos dois desfechos;
+- cada arquivo ruim dá a sua mensagem em português: não-objeto, versão futura,
+  logo de outro formato, logo sem cabeçalho, logo acima de 2 MB, texto que não
+  é JSON.
+
+A rejeição de `atualizarPreview()` nesse contexto é o ruído esperado que o
+`CLAUDE.md` já descreve — sem rede no harness. **O que o Node não prova**:
+layout, eventos de verdade e a CSP. Falta a conferência no navegador pelo
+usuário, como na 8.3.
+
+---
+
 ## Avaliação de modelo e de contexto (pedido pelo usuário)
 
 > **Escrita no planejamento, revista em 2026-09-06.** As etapas 1–7 citadas

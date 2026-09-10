@@ -15,7 +15,7 @@ decisão.
 
 ```bash
 uv sync                                    # cria o ambiente (baixa o Python 3.14)
-uv run pytest -q                           # 70 testes
+uv run pytest -q                           # 83 testes
 uv run ruff check . && uv run ruff format --check .   # o que o CI cobra
 uv run uvicorn bingo.api:app --reload --host 0.0.0.0   # http://localhost:8000
 scripts/fumaca.sh http://127.0.0.1:8000    # o serviço responde de verdade
@@ -65,7 +65,7 @@ paralelos — `testes`, `estatica` e `imagem` — e o último constrói o estág
 | Arquivo | Responsabilidade |
 |---|---|
 | `src/bingo/models.py` | `ConfiguracaoJogo`: dataclass imutável que valida no `__post_init__` e expõe `elementos_por_folha`, `universo`, `indice_centro` |
-| `src/bingo/gerador.py` | `gerar_jogo(cfg)` → tupla de folhas distintas; cada folha é uma tupla de células em ordem de leitura, com `None` no centro livre |
+| `src/bingo/gerador.py` | `gerar_jogo(cfg)` → tupla de folhas distintas; cada folha é uma tupla de células em ordem de leitura, com `None` no centro livre. Sorteia por `random.Random(cfg.semente)` |
 | `src/bingo/pdf.py` | Desenho em A4 retrato; `desenhar_folha` é compartilhada por `gerar_pdf_folha` e `gerar_pdf_jogo` |
 | `src/bingo/api.py` | Rotas `POST /api/preview` (uma folha) e `POST /api/jogo` (PDF completo), `/` e `/static` |
 | `static/app.js` | Todo o tráfego HTTP passa pelo objeto `Api`; o resto da interface não conhece o servidor |
@@ -76,7 +76,8 @@ levanta vira 422 com a mensagem em português, exibida direto na interface. O
 
 O serviço é **stateless**: cada requisição traz a configuração completa e recebe
 um PDF. Nada é salvo no servidor; a última configuração fica no `localStorage` do
-navegador (chaves `bingo.configuracao` e `bingo.tema`).
+navegador (chaves `bingo.configuracao` e `bingo.tema`) e, de forma durável, num
+**arquivo JSON** que o usuário salva e abre pela interface.
 
 O logo enviado pelo usuário viaja como **data URI dentro do JSON**, e não em
 `multipart/form-data`: assim o serviço continua stateless, é uma requisição só e
@@ -89,7 +90,21 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
 - Grade de linhas × colunas configuráveis; célula central livre só quando ambas
   forem ímpares, e ela recebe o logo (`static/images/logo.jpeg`).
 - Download é um **PDF único multi-página**, uma folha por página.
-- Sorteio com `random.sample`, sem semente, mas **sem folhas repetidas** dentro de
+- **Semente do sorteio** (`semente: int | None`): `random.Random(cfg.semente)` num
+  caminho único, sem ramo condicional — com `None` vale a entropia do sistema.
+  Como `gerar_jogo` sorteia a primeira folha antes de qualquer descarte por
+  repetição, `gerar_folha` com a mesma semente devolve exatamente essa folha: **o
+  preview é a primeira página do PDF baixado**, medido byte a byte no fluxo de
+  desenho. A faixa para em `2**32-1` porque acima de `2**53` o `Number` do
+  JavaScript perde precisão. O botão "Sortear novamente" **troca a semente** —
+  sem isso ele redesenharia a mesma cartela.
+- **Configuração em arquivo JSON**: `{version: 1, ...configuração, logo_nome}` —
+  o mesmo objeto que a API aceita, com o logo como data URI e a semente junto. É
+  o caminho durável (o `localStorage` não guarda o logo e some com a limpeza do
+  navegador) e vira compartilhamento por e-mail sem custo de código. Tudo no
+  frontend: o backend não sabe que o arquivo existe. Importar **não pode
+  lançar**, pela mesma razão que `restaurar()` não pode.
+- Sorteio com `random.sample`, sem semente fixa por padrão, mas **sem folhas repetidas** dentro de
   um jogo: `gerar_jogo` compara as folhas por `frozenset` e re-sorteia as iguais.
   A folha continua uma tupla ordenada, porque a ordem define a posição na grade.
   Sem isso, um bingo de 12 palavras saía com cartelas idênticas em 64% dos jogos.
@@ -199,8 +214,15 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   `src/bingo/models.py` (a autoridade), a constante no topo de `static/app.js` e
   o atributo do campo em `static/index.html`. Vale para `MAX_ELEMENTOS`,
   `MAX_CELULAS`, `MAX_FOLHAS` e `MAX_PALAVRA_CARACTERES`. O `api.py` importa de
-  `models.py`, então não conta como quarta cópia.
-- **Input de arquivo: limpar `value` depois de ler.** Sem isso, escolher o mesmo
+  `models.py`, então não conta como quarta cópia. `MAX_SEMENTE` vive em dois
+  lugares só: não há campo de semente na tela.
+- **PDF do reportlab não é comparável byte a byte**: ele carimba data de criação
+  e ID de documento, então dois PDFs do mesmo jogo diferem no arquivo. Para
+  comparar, use o texto extraído da página ou
+  `page.get_contents().get_data()` (`pypdf`). E **`pdftoppm` nem sempre está
+  instalado** — não estava na Etapa 9.
+- **Input de arquivo: limpar `value` depois de ler.** Vale para os dois, o do
+  logo e o da configuração. Sem isso, escolher o mesmo
   arquivo outra vez não dispara `change` e a interface parece morta — isso já
   custou uma sessão inteira de diagnóstico. E **não aninhe o `<input>` dentro do
   `<label>`** que serve de botão: o clique borbulha de volta ao label, que o
