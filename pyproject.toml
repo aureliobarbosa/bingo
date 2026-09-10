@@ -2,7 +2,10 @@
 name = "bingo"
 version = "0.9"
 description = "Gerador web de cartelas de bingo para impressão"
+authors = [{ name = "Marco Aurélio Alves Barbosa" }]
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.115",
