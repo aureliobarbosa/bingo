@@ -15,7 +15,7 @@ decisão.
 
 ```bash
 uv sync                                    # cria o ambiente (baixa o Python 3.14)
-uv run pytest -q                           # 83 testes
+uv run pytest -q                           # 84 testes
 uv run ruff check . && uv run ruff format --check .   # o que o CI cobra
 uv run uvicorn bingo.api:app --reload --host 0.0.0.0   # http://localhost:8000
 scripts/fumaca.sh http://127.0.0.1:8000    # o serviço responde de verdade
@@ -67,7 +67,7 @@ paralelos — `testes`, `estatica` e `imagem` — e o último constrói o estág
 | `src/bingo/models.py` | `ConfiguracaoJogo`: dataclass imutável que valida no `__post_init__` e expõe `elementos_por_folha`, `universo`, `indice_centro` |
 | `src/bingo/gerador.py` | `gerar_jogo(cfg)` → tupla de folhas distintas; cada folha é uma tupla de células em ordem de leitura, com `None` no centro livre. Sorteia por `random.Random(cfg.semente)` |
 | `src/bingo/pdf.py` | Desenho em A4 retrato; `desenhar_folha` é compartilhada por `gerar_pdf_folha` e `gerar_pdf_jogo` |
-| `src/bingo/api.py` | Rotas `POST /api/preview` (uma folha) e `POST /api/jogo` (PDF completo), `/` e `/static` |
+| `src/bingo/api.py` | Rotas `POST /api/preview` (uma folha) e `POST /api/jogo` (PDF completo), `/static` e `/`, que injeta a versão do pacote na página |
 | `static/app.js` | Todo o tráfego HTTP passa pelo objeto `Api`; o resto da interface não conhece o servidor |
 
 Regras de negócio ficam **na dataclass**, não na API: o `ValueError` que ela
@@ -171,6 +171,16 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   vazio de propósito — estático copiado para lá seria servido *antes* do
   rewrite. O deploy do Hosting é manual, de uma vez; o `run.app` continua
   público.
+- **Botões do painel todos no mesmo azul** (`btn-primary`), com sombreamento no
+  hover tirado de `--bs-emphasis-color-rgb`, que se inverte com o tema. O par
+  Números/Palavras fica em contorno: ali o preenchimento é o que marca a
+  escolha. O rodapé leva versão, autoria, o ícone do GitHub em SVG embutido
+  (a CSP barraria `<img>` de outro domínio) e o link do Lattes.
+- **O repositório é peça de portfólio, sob licença MIT, e não recebe PR da
+  comunidade** — o ajuste é do GitHub, em *Settings → General → Features*, e
+  não trava clone nem fork. O `README.md` fala com dois leitores, o professor
+  que quer usar e quem avalia o trabalho, e não aponta para arquivo nenhum do
+  projeto.
 
 ## Armadilhas já encontradas
 
@@ -198,10 +208,13 @@ isso, ao recarregar a página, o logo volta a ser o padrão.
   o `env.UV_VERSION` de `.github/workflows/ci.yml`. Elas devem andar juntas,
   senão o CI resolve dependências com uma ferramenta diferente da que constrói
   a imagem.
-- **A versão do projeto vive em dois lugares** até o controle automatizado
-  chegar: o `version` do `pyproject.toml` e o rodapé de `static/index.html`.
-  Elas mudam juntas, e `test_a_versao_da_tela_acompanha_a_do_pyproject` reprova
-  se não mudarem.
+- **A versão do projeto tem fonte única: o `version` do `pyproject.toml`.** A
+  página traz o marcador `{{versao}}` e `index()` o troca ao servir `/`, lendo
+  `importlib.metadata.version("bingo")`. Subir de versão é editar essa linha e
+  rodar `uv lock`. Ler o `pyproject.toml` em execução **não** funcionaria: ele
+  não entra na imagem de produção. E `index()` lê o HTML a cada requisição de
+  propósito — guardá-lo em memória quebraria o `--reload`, que observa `.py` e
+  não `.html`.
 - **`comando | head` sob `set -o pipefail` reprova ao acaso.** O `head` fecha o
   cano e quem escreve morre de EPIPE — mas só quando a saída não cabe no buffer
   de 64 KB do pipe. Foi assim que o `scripts/fumaca.sh` passou localmente e

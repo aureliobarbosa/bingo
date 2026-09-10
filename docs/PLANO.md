@@ -1,9 +1,10 @@
 # Bingo — o que falta fazer
 
-> **Andamento** — Etapas 8 e 9 concluídas. O serviço está publicado em
-> **https://bingo410.web.app** (Firebase Hosting à frente do Cloud Run), cada
-> push em `main` implanta sozinho, e a configuração agora tem semente e sai em
-> arquivo JSON. **Resta a 10 (documentação).**
+> **Andamento** — **o plano acabou.** As dez etapas estão concluídas e o
+> projeto está na **1.0**, publicado em **https://bingo410.web.app** (Firebase
+> Hosting à frente do Cloud Run), com cada push em `main` implantando sozinho.
+> O que resta é o que só o navegador de uma pessoa responde, listado em
+> [Conferências pendentes](#conferências-pendentes).
 
 O porquê de cada escolha já feita está em [DECISOES.md](DECISOES.md) — consulte-o
 ao mexer numa área pronta; não é preciso lê-lo inteiro para começar uma etapa. O
@@ -13,7 +14,7 @@ resumo de uma linha por decisão está no [CLAUDE.md](../CLAUDE.md).
 
 Serviço *stateless* que gera cartelas de bingo em PDF para impressão: FastAPI e
 ReportLab Toolkit no backend, Bootstrap 5 com JavaScript sem build step no frontend. O devcontainer e a imagem de produção saem do mesmo `Dockerfile`, com base única
-nos três estágios. Os 83 testes passam e o serviço está publicado no Google Cloud Run.
+nos três estágios. Os 84 testes passam e o serviço está publicado no Google Cloud Run.
 
 **Origem das etapas 6.2 a 9:** um briefing produzido numa sessão paralela sobre
 hospedagem, servidor e armazenamento, conferido contra o código. Ele confirmou
@@ -97,19 +98,46 @@ layout, os eventos nem a CSP.
 
 ---
 
-## Etapa 10 — Documentação
+## Etapa 10 — Documentação, estilo e versionamento — **concluída**
 
-Escrita depois que o container, o servidor e o arquivo de configuração
-estiverem definidos, para descrever o que de fato existe.
+Feita em quatro commits, com os testes junto (84 no total). O porquê de cada
+escolha está em [DECISOES.md](DECISOES.md); em uma linha cada:
 
-`README.md` com: o que é, como rodar localmente
-(`uv run uvicorn bingo.api:app --reload --host 0.0.0.0`, com o porquê do
-`--host` para quem trabalha no devcontainer), como rodar os testes
-(`uv run pytest`),
-como construir e executar o container, como está implantado e como usar o
-arquivo de configuração.
+- **A versão tem fonte única** — o `version` do `pyproject.toml`; a página traz
+  o marcador `{{versao}}` e `index()` o troca pelo que o `importlib.metadata`
+  informa. Ler o `pyproject.toml` em execução não funcionaria: ele não entra na
+  imagem de produção.
+- **`index()` lê o HTML a cada requisição** — guardá-lo em memória quebraria o
+  `--reload`, que observa `.py` e não `.html`.
+- **O teste trocou de alvo** — em vez de comparar duas cópias, pede `/` e cobra
+  a injeção; conferido que reprova nas duas quebras possíveis.
+- **Botões do painel no mesmo azul**, com sombra no hover que se inverte com o
+  tema. O par Números/Palavras fica de fora: ali o preenchimento é o que marca
+  a escolha.
+- **Rodapé com autoria** — ícone do GitHub em SVG embutido, porque a CSP
+  barraria `<img>` de outro domínio, e o link do Lattes.
+- **Licença MIT** em três lugares que dizem o mesmo: o arquivo, o metadado do
+  pacote e o README.
+- **README para dois leitores** — o professor que quer usar e quem avalia o
+  trabalho —, sem ponteiro para arquivo nenhum do projeto. O repositório não
+  recebe PR da comunidade, o que o GitHub ajusta sem arquivar nada.
 
-Commit: `docs: README com instruções de uso e deploy`.
+Falta a imagem da tela: a seção está escrita e comentada no README, esperando o
+arquivo em `docs/imagens/tela.png`.
+
+---
+
+## Conferências pendentes
+
+Nenhuma é de código: são as que só o navegador de uma pessoa responde.
+
+1. **A CSP no Firefox pelo endereço novo** (Etapa 8.4). Os cabeçalhos
+   atravessam a CDN inteiros e a fumaça passa, mas quem obedece à CSP é o
+   navegador e o erro é silencioso. O Firefox é o teste severo: o pdf.js é
+   página comum, sujeita à política, enquanto o Chrome desenha PDF por um
+   visualizador interno que escapa dela.
+2. **A Etapa 9 no navegador** — salvar e abrir o arquivo de configuração, com o
+   logo e a semente voltando inteiros.
 
 ---
 

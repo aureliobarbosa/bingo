@@ -1,6 +1,6 @@
 [project]
 name = "bingo"
-version = "0.9"
+version = "1.0"
 description = "Gerador web de cartelas de bingo para impressão"
 authors = [{ name = "Marco Aurélio Alves Barbosa" }]
 readme = "README.md"

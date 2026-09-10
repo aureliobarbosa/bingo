@@ -1334,6 +1334,118 @@ usuário, como na 8.3.
 
 ---
 
+## Etapa 10 — Documentação, estilo e versionamento — **concluída**
+
+### A versão passa a ter uma fonte só
+
+Ela vivia em dois lugares — o `version` do `pyproject.toml` e o rodapé de
+`static/index.html` — com um teste comparando as duas cópias. O teste evitava a
+divergência mas não a duplicação: subir de versão continuava sendo lembrar de
+dois arquivos.
+
+Agora a página traz o marcador `{{versao}}` e `index()` o troca por
+`importlib.metadata.version("bingo")`. Três caminhos foram considerados:
+
+- **Ler o `pyproject.toml` em execução.** Não funciona, e a razão é a mesma
+  armadilha do `RAIZ_PROJETO`: o estágio `producao` copia só `src/` e
+  `static/`, e o `pyproject.toml` não vai junto. Quebraria só em produção.
+- **Versão saindo da tag do git.** Exigiria um plugin de versão dinâmica (o
+  `uv_build` não faz isso), o `.git` dentro do build da imagem — hoje no
+  `.dockerignore` — e um passo novo no `deploy.yml`. Muito maquinário para um
+  número que muda uma vez por etapa.
+- **Rota `/versao` com `fetch` no `app.js`.** Mantinha o `/` como `FileResponse`
+  ao custo de uma requisição a mais e de um rodapé que pisca. Descartada.
+
+A injeção venceu por não acrescentar peça nenhuma: o `importlib.metadata` já
+está na biblioteca padrão e a metadata já é instalada pelo `uv sync` que o
+`Dockerfile` roda.
+
+**`index()` lê o arquivo a cada requisição, e isso é deliberado.** Guardar a
+página em memória na partida quebraria o `--reload` do desenvolvimento: o
+uvicorn observa `.py` e não `.html`, então toda edição da tela exigiria
+reiniciar o servidor. São poucos KB num serviço que recebe menos de três
+requisições por dia.
+
+**A metadata instalada é estática**, então subir a versão no `pyproject.toml`
+exige reinstalar o pacote. Na prática o `uv run` sincroniza sozinho antes de
+rodar, e o CI e a imagem partem de instalação nova — mas quem chamar o `pytest`
+fora do `uv run` vê a versão velha.
+
+O `v` de `v1.0` fica no HTML, e o `pyproject` guarda só o número: é o formato
+que a especificação de versão pede.
+
+### O teste trocou de alvo
+
+`test_a_versao_da_tela_vem_do_pyproject` deixou de comparar duas cópias e passou
+a pedir `/`, cobrando três coisas: que a versão do `pyproject.toml` chegue ao
+navegador, que nenhum marcador cru escape, e que o marcador continue no arquivo
+— sem esta última, uma versão escrita à mão de volta no HTML mataria a injeção
+sem quebrar o resto. Conferido que ele reprova nas duas quebras possíveis.
+
+### Botões, e por que dois ficaram de fora
+
+Os botões do painel estavam em três aparências — azul preenchido, contorno azul
+e contorno cinza — sem que a diferença significasse nada. Os cinco viraram
+`btn-primary`, com sombreamento leve no hover.
+
+A sombra sai de `rgba(var(--bs-emphasis-color-rgb), .25)`, que o Bootstrap
+inverte junto com o tema: escura no claro, clara no escuro. Uma sombra preta
+fixa desapareceria no modo noturno, que o projeto tem.
+
+Ficaram de fora o par Números/Palavras, onde é o preenchimento que mostra qual
+está escolhido — preencher os dois apagaria a informação —, e o ícone de tema,
+que é ícone sem borda.
+
+### Autoria no rodapé, e a licença em três lugares
+
+O rodapé ganhou o ícone do GitHub e o link do Lattes ao lado do nome. O ícone é
+**SVG embutido**, não `<img>`: a CSP fecha `img-src` em `'self' data:`, então
+imagem de outro domínio não carregaria — e o erro seria silencioso.
+
+A licença MIT entrou como arquivo, como `license`/`license-files` no
+`pyproject.toml` (a metadata instalada passa a dizer `License-Expression: MIT`)
+e como uma linha no README. O nome completo do autor é o mesmo nos três, mais o
+rodapé da página: divergência entre eles não apareceria sozinha.
+
+### O README fala com dois leitores, e nenhum deles é colaborador
+
+Quem chega ao repositório é o professor que quer usar o gerador — e precisa do
+endereço, não de instruções de build — ou quem avalia o trabalho como peça de
+portfólio. Daí o endereço em destaque logo depois do primeiro parágrafo, a
+seção sobre o método de desenvolvimento, e uma única instrução de execução
+(`uv sync` e o `uvicorn`), sem devcontainer, sem `docker build` e sem seção de
+testes.
+
+**Sem ponteiro para arquivo nenhum do projeto**, `docs/` inclusive: o que
+interessa ao leitor está no próprio README, e os documentos de trabalho ficam
+para quem for procurar.
+
+**O repositório não recebe PR da comunidade.** Isso não exige arquivar nada: o
+GitHub tem ajuste próprio desde 13/02/2026, em *Settings → General → Features*,
+que restringe a criação de pull requests a colaboradores sem travar clone, fork
+nem leitura. O motivo declarado pelo próprio GitHub é o volume de contribuições
+geradas por IA que consome o tempo de quem mantém o projeto.
+
+A menção a *Test Driven Development* saiu do texto do autor: os testes foram
+escritos junto de cada funcionalidade, no mesmo commit, e não antes dela. Num
+README de portfólio, quem conhece a sigla confere o histórico e vê a diferença.
+
+### O que ficou faltando
+
+A conferência no navegador é do usuário — não há Chrome nem Chromium neste
+ambiente, e o Firefox headless não roda aqui. Ele conferiu a tela: os botões
+azuis, o sombreamento, o rodapé com os links e `Bingo410 v0.9` no lugar certo,
+em tema escuro.
+
+Continuam pendentes, de etapas anteriores: a CSP no Firefox pelo endereço novo
+e a conferência da Etapa 9 no navegador.
+
+A imagem da tela no README ficou como seção escrita e comentada, esperando o
+arquivo em `docs/imagens/tela.png` — um `![]()` apontando para arquivo
+inexistente renderiza ícone quebrado justamente na página do projeto.
+
+---
+
 ## Avaliação de modelo e de contexto (pedido pelo usuário)
 
 > **Escrita no planejamento, revista em 2026-09-06.** As etapas 1–7 citadas
