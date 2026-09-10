@@ -62,9 +62,14 @@ for _ in $(seq "${TENTATIVAS}"); do
 done
 [ -n "${pronto}" ] || falhar "o serviço não respondeu em ${TENTATIVAS}s"
 
-echo "1/4 a página inicial é servida"
+echo "1/4 a página inicial é servida, com a versão injetada"
 baixar GET "/" "${TMP}/index.html"
 grep -q "<title>" "${TMP}/index.html" || falhar "/: a resposta não parece o index.html"
+# A versão sai da metadata do pacote instalado. Na imagem de produção não há
+# `pyproject.toml`, então este é o único lugar onde a injeção pode ser provada
+# no ambiente que de fato vai para o ar.
+grep -qE "Bingo410 v[0-9]" "${TMP}/index.html" || falhar "/: a versão não foi injetada"
+! grep -q "{{versao}}" "${TMP}/index.html" || falhar "/: o marcador da versão escapou cru"
 
 echo "2/4 os estáticos acompanham a árvore do projeto"
 baixar GET "/static/app.js" "${TMP}/app.js"
