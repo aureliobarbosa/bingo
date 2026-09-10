@@ -209,11 +209,11 @@ BTS</textarea>
           </div>
         </form>
 
-        <!-- A versão vive aqui e no `version` do pyproject.toml. Até existir o
-             controle automatizado, elas mudam juntas — e há teste que confere. -->
+        <!-- O marcador é trocado pela versão do pacote ao servir `/`. Abrir
+             este arquivo direto do disco mostra o marcador cru, e é esperado. -->
         <p class="text-body-secondary small text-center border-top mt-4 pt-3 mb-0"
            id="versao">
-          Bingo410 0.9<br>
+          Bingo410 v{{versao}}<br>
           Desenvolvido por Marco Aurélio Alves Barbosa (UnB)<br>
           <!-- Ícone como SVG embutido, e não <img>: a CSP fecha `img-src` em
                'self' e data:, então imagem de outro domínio não carregaria. -->

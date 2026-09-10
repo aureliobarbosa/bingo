@@ -343,11 +343,20 @@ def test_o_arquivo_de_configuracao_e_aceito_como_esta_pelas_rotas():
     assert r.headers["content-type"] == "application/pdf"
 
 
-def test_a_versao_da_tela_acompanha_a_do_pyproject():
-    """A versão vive em dois lugares — o `pyproject.toml` e o rodapé do painel —
-    até existir o controle automatizado. Este teste é o que impede que se
-    separem: quem subir uma e esquecer a outra descobre aqui, não no ar."""
+def test_a_versao_da_tela_vem_do_pyproject():
+    """A versão tem fonte única: o `version` do `pyproject.toml`.
+
+    A página guarda um marcador e o serviço o troca ao servir `/`. O teste
+    cobra as duas pontas — que a versão certa chega ao navegador e que nenhum
+    marcador cru escapa — e o marcador no arquivo, porque uma versão escrita à
+    mão de volta no HTML mataria a injeção sem quebrar o resto.
+    """
     pyproject = tomllib.loads((RAIZ_PROJETO / "pyproject.toml").read_text())
     versao = pyproject["project"]["version"]
-    pagina = (STATIC / "index.html").read_text(encoding="utf-8")
-    assert f"Bingo410 {versao}" in pagina
+
+    arquivo = (STATIC / "index.html").read_text(encoding="utf-8")
+    assert api.MARCADOR_VERSAO in arquivo
+
+    pagina = client.get("/").text
+    assert f"Bingo410 v{versao}" in pagina
+    assert api.MARCADOR_VERSAO not in pagina

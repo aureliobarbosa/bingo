@@ -4,13 +4,14 @@ O serviço é stateless: cada requisição traz a configuração completa do jog
 e recebe de volta um PDF.
 """
 
+import importlib.metadata
 import math
 import time
 from collections import deque
 from typing import Annotated
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -27,6 +28,13 @@ from bingo.models import (
 from bingo.pdf import RAIZ_PROJETO, gerar_pdf_folha, gerar_pdf_jogo
 
 STATIC = RAIZ_PROJETO / "static"
+
+# A versão tem uma fonte só: o `version` do `pyproject.toml`. Ler o arquivo em
+# tempo de execução não serviria — ele não entra na imagem de produção, que
+# copia apenas `src/` e `static/` —, então quem responde é a metadata do pacote
+# instalado no ambiente. A página traz o marcador abaixo, e `index()` o troca.
+VERSAO = importlib.metadata.version("bingo")
+MARCADOR_VERSAO = "{{versao}}"
 
 # Teto do corpo da requisição. O pior caso legítimo é um logo de 2 MB, que vira
 # ~2,8 MB em base64, mais as palavras e o cabeçalho — 4 MB deixa folga. Sem este
@@ -287,11 +295,23 @@ class EstaticosRevalidados(StaticFiles):
 
 
 @app.get("/", include_in_schema=False)
-def index() -> FileResponse:
-    # Mesma revalidação dos estáticos. Aqui sem 304: a rota não confere o
-    # `If-None-Match`, e reenviar um index.html de poucos KB não paga o código
-    # que faria isso.
-    return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
+def index() -> HTMLResponse:
+    """A página, com a versão no lugar do marcador.
+
+    O arquivo é lido a cada requisição, e não uma vez na partida: o `--reload`
+    do desenvolvimento observa `.py` e não `.html`, então uma página guardada
+    em memória só mudaria reiniciando o servidor. São poucos KB e o serviço
+    recebe poucas requisições por dia.
+
+    Mesma revalidação dos estáticos. Aqui sem 304: a rota não confere o
+    `If-None-Match`, e reenviar um index.html de poucos KB não paga o código
+    que faria isso.
+    """
+    pagina = (STATIC / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(
+        pagina.replace(MARCADOR_VERSAO, VERSAO),
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 app.mount("/static", EstaticosRevalidados(directory=STATIC), name="static")
