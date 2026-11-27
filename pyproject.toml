@@ -26,6 +26,12 @@ dev = [
 requires = ["uv_build>=0.11,<0.12"]
 build-backend = "uv_build"
 
+# Ponto de entrada para o `fastapi run`, que é como o FastAPI Cloud sobe o
+# serviço. Sem isto o CLI procura `main.py`/`app.py`/`api.py` na raiz e não acha
+# nada, porque o app vive em `src/bingo/api.py`.
+[tool.fastapi]
+entrypoint = "bingo.api:app"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
